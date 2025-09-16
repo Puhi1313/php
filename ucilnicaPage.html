@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="sl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tvoji Predmeti</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f9f9f9;
+    }
+    header {
+      background: #ddd;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 15px 30px;
+    }
+    header .logo {
+      font-weight: bold;
+      font-size: 18px;
+    }
+    nav a {
+      margin-left: 20px;
+      text-decoration: none;
+      color: black;
+      font-size: 14px;
+    }
+    nav a:hover {
+      text-decoration: underline;
+    }
+    .student-name {
+      font-size: 14px;
+      color: #333;
+    }
+    .container {
+      padding: 30px;
+    }
+    .title {
+      font-size: 18px;
+      margin-bottom: 20px;
+    }
+    .day {
+      border: 1px solid #ccc;
+      margin-bottom: 10px;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .day-header {
+      background: #fff;
+      padding: 15px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .day-content {
+      display: none;
+      padding: 15px;
+      background: #f4f4f4;
+    }
+    .day-content ul {
+      margin: 0;
+      padding-left: 20px;
+    }
+    .day.open .day-content {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo">LOGO</div>
+    <nav>
+      <a href="#stran1">stran1</a>
+      <a href="#stran2">stran2</a>
+      <a href="#stran3">stran3</a>
+      <a href="#stran4">stran4</a>
+    </nav>
+    <div class="student-name">UČENCEVO IME</div>
+  </header>
+
+  <div class="container">
+    <div class="title">Tvoji predmeti</div>
+    <p>Danšnja naloga:</p>
+
+    <div id="pon" class="day">
+      <div class="day-header">PON</div>
+      <div class="day-content">
+        <ul>
+          <li>MAT</li>
+          <li>SMV</li>
+          <li>SLO</li>
+        </ul>
+      </div>
+    </div>
+
+    <div id="tor" class="day">
+      <div class="day-header">TOR</div>
+      <div class="day-content">
+        <ul>
+          <li>MAT</li>
+          <li>ANG</li>
+        </ul>
+      </div>
+    </div>
+
+    <div id="sre" class="day">
+      <div class="day-header">SRE</div>
+      <div class="day-content">
+        <ul>
+          <li>FIZ</li>
+          <li>KEM</li>
+        </ul>
+      </div>
+    </div>
+
+    <div id="cet" class="day">
+      <div class="day-header">ČET</div>
+      <div class="day-content">
+        <ul>
+          <li>ZGO</li>
+          <li>BIO</li>
+        </ul>
+      </div>
+    </div>
+
+    <div id="pet" class="day">
+      <div class="day-header">PET</div>
+      <div class="day-content">
+        <ul>
+          <li>ŠPO</li>
+          <li>LIK</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Toggle day content on click
+    document.querySelectorAll('.day-header').forEach(header => {
+      header.addEventListener('click', () => {
+        header.parentElement.classList.toggle('open');
+      });
+    });
+
+    // Auto-open today's day
+    const today = new Date().getDay(); // Sunday=0, Monday=1, ... Friday=5
+    const days = {
+      1: 'pon',
+      2: 'tor',
+      3: 'sre',
+      4: 'cet',
+      5: 'pet'
+    };
+    if (days[today]) {
+      document.getElementById(days[today]).classList.add('open');
+    }
+  </script>
+</body>
+</html>
