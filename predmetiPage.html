@@ -59,27 +59,43 @@
       gap: 15px;
     }
     .subject {
-      background: #66ff66;
-      border: none;
-      border-radius: 8px;
-      padding: 12px;
-      font-size: 16px;
-      font-weight: bold;
-      cursor: pointer;
-      transition: transform 0.2s;
+        background: #66ff66;
+        border-radius: 8px;
+        padding: 12px;
+        font-size: 16px;
+        font-weight: bold;
+        cursor: pointer;
+        transition: transform 0.2s;
+        /* naj bo nad osnovnim ozadjem */
     }
     .subject:hover {
       transform: scale(1.05);
     }
+    /* Dropdown meni */
     .dropdown {
-      margin-top: 8px;
-      display: none;
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: white;
+        border: 1px solid #999;
+        border-radius: 6px;
+        display: none;
+        list-style: none;
+        padding: 0;
+        margin: 0 0 0 0;
+        /* poskrbi da dropdown skoči v ospredje */
     }
-    select {
-      width: 100%;
-      padding: 6px;
-      border-radius: 6px;
-      border: 1px solid #999;
+    .dropdown li {
+      padding: 8px;
+      cursor: pointer;
+    }
+    .dropdown li:hover {
+      background: #f0f0f0;
+    }
+    /* Pokaži dropdown ob hoverju */
+    .subject:hover .dropdown {
+      display: block;
     }
   </style>
 </head>
@@ -101,107 +117,86 @@
     <div class="card">
       <h3>Izberi predmete, ki jih želiš imeti:</h3>
       <div class="subjects">
-        <div>
-          <button class="subject" data-subject="Matematika">Matematika</button>
-          <div class="dropdown">
-            <select>
-              <option value="">Izberi učitelja</option>
-              <option value="Učitelj A">Učitelj A</option>
-              <option value="Učitelj B">Učitelj B</option>
-            </select>
-          </div>
+        <div class="subject" data-subject="Matematika">
+          Matematika
+          <ul class="dropdown">
+            <li data-teacher="Učitelj A">Učitelj A</li>
+            <li data-teacher="Učitelj B">Učitelj B</li>
+          </ul>
         </div>
-        <div>
-          <button class="subject" data-subject="Slovenščina">Slovenščina</button>
-          <div class="dropdown">
-            <select>
-              <option value="">Izberi učitelja</option>
-              <option value="Učitelj C">Učitelj C</option>
-              <option value="Učitelj D">Učitelj D</option>
-            </select>
-          </div>
+        <div class="subject" data-subject="Slovenščina">
+          Slovenščina
+          <ul class="dropdown">
+            <li data-teacher="Učitelj C">Učitelj C</li>
+            <li data-teacher="Učitelj D">Učitelj D</li>
+          </ul>
         </div>
-        <div>
-          <button class="subject" data-subject="Angleščina">Angleščina</button>
-          <div class="dropdown">
-            <select>
-              <option value="">Izberi učitelja</option>
-              <option value="Učitelj E">Učitelj E</option>
-              <option value="Učitelj F">Učitelj F</option>
-            </select>
-          </div>
+        <div class="subject" data-subject="Angleščina">
+          Angleščina
+          <ul class="dropdown">
+            <li data-teacher="Učitelj E">Učitelj E</li>
+            <li data-teacher="Učitelj F">Učitelj F</li>
+          </ul>
         </div>
-        <div>
-          <button class="subject" data-subject="Fizika">Fizika</button>
-          <div class="dropdown">
-            <select>
-              <option value="">Izberi učitelja</option>
-              <option value="Učitelj G">Učitelj G</option>
-              <option value="Učitelj H">Učitelj H</option>
-            </select>
-          </div>
+        <div class="subject" data-subject="Fizika">
+          Fizika
+          <ul class="dropdown">
+            <li data-teacher="Učitelj G">Učitelj G</li>
+            <li data-teacher="Učitelj H">Učitelj H</li>
+          </ul>
         </div>
-        <div>
-          <button class="subject" data-subject="Kemija">Kemija</button>
-          <div class="dropdown">
-            <select>
-              <option value="">Izberi učitelja</option>
-              <option value="Učitelj I">Učitelj I</option>
-              <option value="Učitelj J">Učitelj J</option>
-            </select>
-          </div>
+        <div class="subject" data-subject="Kemija">
+          Kemija
+          <ul class="dropdown">
+            <li data-teacher="Učitelj I">Učitelj I</li>
+            <li data-teacher="Učitelj J">Učitelj J</li>
+          </ul>
         </div>
-        <div>
-          <button class="subject" data-subject="Zgodovina">Zgodovina</button>
-          <div class="dropdown">
-            <select>
-              <option value="">Izberi učitelja</option>
-              <option value="Učitelj K">Učitelj K</option>
-              <option value="Učitelj L">Učitelj L</option>
-            </select>
-          </div>
+        <div class="subject" data-subject="Zgodovina">
+          Zgodovina
+          <ul class="dropdown">
+            <li data-teacher="Učitelj K">Učitelj K</li>
+            <li data-teacher="Učitelj L">Učitelj L</li>
+          </ul>
         </div>
-        <div>
-          <button class="subject" data-subject="Biologija">Biologija</button>
-          <div class="dropdown">
-            <select>
-              <option value="">Izberi učitelja</option>
-              <option value="Učitelj M">Učitelj M</option>
-              <option value="Učitelj N">Učitelj N</option>
-            </select>
-          </div>
+        <div class="subject" data-subject="Biologija">
+          Biologija
+          <ul class="dropdown">
+            <li data-teacher="Učitelj M">Učitelj M</li>
+            <li data-teacher="Učitelj N">Učitelj N</li>
+          </ul>
         </div>
       </div>
     </div>
   </section>
 
   <script>
-    const subjects = document.querySelectorAll('.subject');
-    const savedChoices = JSON.parse(localStorage.getItem('choices')) || {};
+    const choices = JSON.parse(localStorage.getItem('choices')) || {};
 
-    subjects.forEach(button => {
-      const parent = button.parentElement;
-      const dropdown = parent.querySelector('.dropdown');
-      const select = dropdown.querySelector('select');
-      const subject = button.dataset.subject;
+    // ob kliku na učitelja
+    document.querySelectorAll('.dropdown li').forEach(item => {
+      item.addEventListener('click', (e) => {
+        const subjectDiv = e.target.closest('.subject');
+        const subject = subjectDiv.dataset.subject;
+        const teacher = e.target.dataset.teacher;
 
-      // Restore saved teacher if exists
-      if (savedChoices[subject]) {
-        dropdown.style.display = 'block';
-        select.value = savedChoices[subject];
+        // Shrani izbiro
+        choices[subject] = teacher;
+        localStorage.setItem('choices', JSON.stringify(choices));
+
+        // Prikaži izbranega učitelja v škatlici
+        subjectDiv.childNodes[0].textContent = subject + " - " + teacher;
+
+        console.log("Shranjeno:", { subject, teacher });
+      });
+    });
+
+    // Ob ponovnem nalaganju strani pokaži shranjene učitelje
+    document.querySelectorAll('.subject').forEach(subjectDiv => {
+      const subject = subjectDiv.dataset.subject;
+      if (choices[subject]) {
+        subjectDiv.childNodes[0].textContent = subject + " - " + choices[subject];
       }
-
-      // Toggle dropdown when subject clicked
-      button.addEventListener('click', () => {
-        dropdown.style.display = dropdown.style.display === 'block' ? 'none' : 'block';
-      });
-
-      // Save choice when teacher is selected
-      select.addEventListener('change', () => {
-        savedChoices[subject] = select.value;
-        localStorage.setItem('choices', JSON.stringify(savedChoices));
-        console.log('Shranjeno:', savedChoices); // simulate saving to database
-      });
     });
   </script>
 </body>
