@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="sl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Izberi Predmete</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #eafaff;
+    }
+    header {
+      background: #ddd;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 15px 30px;
+    }
+    header .logo {
+      font-weight: bold;
+      font-size: 18px;
+    }
+    nav a {
+      margin-left: 20px;
+      text-decoration: none;
+      color: black;
+      font-size: 14px;
+    }
+    nav a:hover {
+      text-decoration: underline;
+    }
+    .hero {
+      background: #baf0ff;
+      padding: 50px;
+      text-align: center;
+      min-height: 80vh;
+    }
+    .hero h2 {
+      font-size: 22px;
+      margin-bottom: 10px;
+    }
+    .hero strong {
+      font-size: 26px;
+    }
+    .card {
+      background: #ccc;
+      border-radius: 20px;
+      padding: 30px;
+      max-width: 700px;
+      margin: 40px auto;
+    }
+    .card h3 {
+      margin-bottom: 20px;
+    }
+    .subjects {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 15px;
+    }
+    .subject {
+      background: #66ff66;
+      border: none;
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+    .subject:hover {
+      transform: scale(1.05);
+    }
+    .dropdown {
+      margin-top: 8px;
+      display: none;
+    }
+    select {
+      width: 100%;
+      padding: 6px;
+      border-radius: 6px;
+      border: 1px solid #999;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo">LOGO</div>
+    <nav>
+      <a href="#stran1">stran1</a>
+      <a href="#stran2">stran2</a>
+      <a href="#stran3">stran3</a>
+      <a href="#stran4">stran4</a>
+    </nav>
+  </header>
+
+  <section class="hero">
+    <h2>Pozdravljen/a,</h2>
+    <strong>UČENEC</strong>
+
+    <div class="card">
+      <h3>Izberi predmete, ki jih želiš imeti:</h3>
+      <div class="subjects">
+        <div>
+          <button class="subject" data-subject="Matematika">Matematika</button>
+          <div class="dropdown">
+            <select>
+              <option value="">Izberi učitelja</option>
+              <option value="Učitelj A">Učitelj A</option>
+              <option value="Učitelj B">Učitelj B</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <button class="subject" data-subject="Slovenščina">Slovenščina</button>
+          <div class="dropdown">
+            <select>
+              <option value="">Izberi učitelja</option>
+              <option value="Učitelj C">Učitelj C</option>
+              <option value="Učitelj D">Učitelj D</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <button class="subject" data-subject="Angleščina">Angleščina</button>
+          <div class="dropdown">
+            <select>
+              <option value="">Izberi učitelja</option>
+              <option value="Učitelj E">Učitelj E</option>
+              <option value="Učitelj F">Učitelj F</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <button class="subject" data-subject="Fizika">Fizika</button>
+          <div class="dropdown">
+            <select>
+              <option value="">Izberi učitelja</option>
+              <option value="Učitelj G">Učitelj G</option>
+              <option value="Učitelj H">Učitelj H</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <button class="subject" data-subject="Kemija">Kemija</button>
+          <div class="dropdown">
+            <select>
+              <option value="">Izberi učitelja</option>
+              <option value="Učitelj I">Učitelj I</option>
+              <option value="Učitelj J">Učitelj J</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <button class="subject" data-subject="Zgodovina">Zgodovina</button>
+          <div class="dropdown">
+            <select>
+              <option value="">Izberi učitelja</option>
+              <option value="Učitelj K">Učitelj K</option>
+              <option value="Učitelj L">Učitelj L</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <button class="subject" data-subject="Biologija">Biologija</button>
+          <div class="dropdown">
+            <select>
+              <option value="">Izberi učitelja</option>
+              <option value="Učitelj M">Učitelj M</option>
+              <option value="Učitelj N">Učitelj N</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <script>
+    const subjects = document.querySelectorAll('.subject');
+    const savedChoices = JSON.parse(localStorage.getItem('choices')) || {};
+
+    subjects.forEach(button => {
+      const parent = button.parentElement;
+      const dropdown = parent.querySelector('.dropdown');
+      const select = dropdown.querySelector('select');
+      const subject = button.dataset.subject;
+
+      // Restore saved teacher if exists
+      if (savedChoices[subject]) {
+        dropdown.style.display = 'block';
+        select.value = savedChoices[subject];
+      }
+
+      // Toggle dropdown when subject clicked
+      button.addEventListener('click', () => {
+        dropdown.style.display = dropdown.style.display === 'block' ? 'none' : 'block';
+      });
+
+      // Save choice when teacher is selected
+      select.addEventListener('change', () => {
+        savedChoices[subject] = select.value;
+        localStorage.setItem('choices', JSON.stringify(savedChoices));
+        console.log('Shranjeno:', savedChoices); // simulate saving to database
+      });
+    });
+  </script>
+</body>
+</html>
