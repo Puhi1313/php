@@ -30,10 +30,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             header("Location: main.php");
             exit;
         } else {
-            echo "<p style='color:red'>Napačno geslo!</p>";
+            echo "<script>alert('Napačno geslo');</script>";
         }
     } else {
-        echo "<p style='color:red'>Uporabnik ne obstaja!</p>";
+        echo  "<script>alert('Uporabnik ne obstaja');</script>";
     }
 }
 ?>
