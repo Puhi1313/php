@@ -165,9 +165,12 @@ try {
       display: block;
     }
   </style>
-  </style>
 </head>
 <body>
+  <video class="video-background" autoplay muted loop>
+    <source src="./video/green_videoPredmeti.mp4" type="video/mp4">
+    Your browser does not support the video tag.
+  </video>
   <header>
     <div class="logo">REDOVALNICA</div>
     <div>Prijavljen: **<?php echo htmlspecialchars($ime_ucenca); ?>** | <a href="logout.php">Odjava</a></div>
