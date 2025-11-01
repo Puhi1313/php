@@ -87,6 +87,20 @@ if (empty($id_predmet) || empty($id_ucitelja)) {
 $naloga = false;
 $seznam_nalog = []; // Novo: Za arhiv vseh nalog
 
+if ($vloga !== 'ucenec') {
+    $sql_arhiv = "
+        SELECT id_naloga, naslov, rok_oddaje 
+        FROM naloga 
+        WHERE id_predmet = ? AND id_ucitelj = ?
+        ORDER BY datum_objave DESC
+    ";
+    $stmt_arhiv = $pdo->prepare($sql_arhiv);
+    $stmt_arhiv->execute([$id_predmet, $user_id]);
+    $naloge_arhiv = $stmt_arhiv->fetchAll();
+} else {
+    $naloge_arhiv = []; // Prazno za učenca
+}
+
 try {
     // Novo: Pridobi seznam vseh nalog za ta predmet in učitelja
     $sql_seznam_nalog = "

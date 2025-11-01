@@ -1,8 +1,6 @@
 <?php 
-// Ta datoteka je vključena v ajax_naloga.php, zato ima dostop do $naloga, $id_predmet, $id_ucitelja in NOVO: $seznam_nalog
+// Ta datoteka je vključena v ajax_naloga.php, zato ima dostop do $pdo, $naloga, $id_predmet, $id_ucitelja in $seznam_nalog
 // $seznam_nalog je array vseh nalog, $naloga je trenutno izbrana (ali zadnja) naloga
-
-// Odstranjena je spremenljivka $prikaz_rocnega_vnosa, saj forma sedaj ni odvisna od tega.
 
 // Pridobivanje podatkov o oddajah, če obstaja aktivna naloga
 $ucenci_za_prikaz = [];
@@ -30,180 +28,167 @@ if (!empty($naloga)) {
         ";
         $stmt_vsi_ucenci = $pdo->prepare($sql_vsi_ucenci);
         $stmt_vsi_ucenci->execute([$id_predmet]);
-        $vsi_ucenci = $stmt_vsi_ucenci->fetchAll();
+        $vsi_ucenci = $stmt_vsi_ucenci->fetchAll(PDO::FETCH_GROUP|PDO::FETCH_UNIQUE);
 
-        // Spojimo oddane in neodane učence v eno tabelo za preglednost
-        $oddani_ucenci_ids = array_column($oddaje, 'id_ucenec');
-
-        foreach ($vsi_ucenci as $ucenec) {
-            $podatki = [
-                'ime' => $ucenec['ime'],
-                'priimek' => $ucenec['priimek'],
-                'datum_oddaje' => null,
-                'status' => 'Ni oddano',
-                'ocena' => null,
-                'id_oddaja' => null,
-                'pot_na_strezniku' => null
-            ];
-            
-            // Poišči oddajo tega učenca
-            // Uporabimo loop, ker array_column ne dela vedno z več istimi idji, čeprav bi moralo biti samo eno
-            $key = array_search($ucenec['id_uporabnik'], $oddani_ucenci_ids);
-            if ($key !== false) {
-                // Če obstaja oddaja, jo dodamo
-                $podatki = array_merge($podatki, $oddaje[$key]);
-                $podatki['status'] = $oddaje[$key]['status']; 
-            }
-            
-            $ucenci_za_prikaz[] = $podatki;
+        // Združite podatke: ustvarite seznam vseh učencev s statusom oddaje
+        $oddaje_map = [];
+        foreach ($oddaje as $oddaja) {
+            $oddaje_map[$oddaja['id_ucenec']] = $oddaja;
         }
 
+        foreach ($vsi_ucenci as $id => $ucenec) {
+            $oddaja_status = isset($oddaje_map[$id]) ? $oddaje_map[$id] : [
+                'id_uporabnik' => $id,
+                'ime' => $ucenec['ime'],
+                'priimek' => $ucenec['priimek'],
+                'status' => 'Ni oddano',
+                'datum_oddaje' => null,
+                'ocena' => null,
+                'id_oddaja' => null
+            ];
+            $ucenci_za_prikaz[] = $oddaja_status;
+        }
+        
+        // Ponovno sortiraj po priimku, ker je PDO::FETCH_GROUP spremenil vrstni red
+        usort($ucenci_za_prikaz, function($a, $b) {
+            return strcmp($a['priimek'], $b['priimek']);
+        });
+
     } catch (\PDOException $e) {
-        $oddaje = [];
-        echo "<p style='color: red;'>Napaka pri pridobivanju oddaj: " . $e->getMessage() . "</p>";
+        echo "<p style='color: red;'>Napaka pri bazi: " . $e->getMessage() . "</p>";
     }
 }
 ?>
 
-<hr style="margin-top: 20px;">
-<h3 style="color: #0056b3;">Seznam vseh nalog za ta predmet (Arhiv)</h3>
-<div style="margin-bottom: 20px;">
-    <label for="naloga-select">Izberite nalogo za pregled:</label>
-    <select id="naloga-select" style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 100%; max-width: 400px;">
-        <?php if (empty($seznam_nalog)): ?>
-            <option value="" disabled selected>Ni objavljenih nalog.</option>
-        <?php else: ?>
-            <?php 
-            $trenutna_naloga_id = $naloga['id_naloga'] ?? null;
-            foreach ($seznam_nalog as $n): 
-                $selected = ($n['id_naloga'] == $trenutna_naloga_id) ? 'selected' : '';
-                $naslov_prikaz = htmlspecialchars($n['naslov']) . ' (' . date('d.m.Y', strtotime($n['rok_oddaje'])) . ')';
-            ?>
-                <option value="<?php echo $n['id_naloga']; ?>" <?php echo $selected; ?>>
-                    <?php echo $naslov_prikaz; ?>
+<div style="margin-bottom: 20px; padding: 10px; border: 1px solid #ccc; background-color: #f7f7f7;">
+    <?php if (!empty($naloga)): ?>
+        <h2>Pregled Naloge: <?php echo htmlspecialchars($naloga['naslov']); ?></h2>
+        <p style="margin-top: 5px; color: #555;">Objavljeno: <?php echo date('d.m.Y H:i', strtotime($naloga['datum_objave'])); ?> | Rok: <span style="font-weight: bold; color: #dc3545;"><?php echo date('d.m.Y H:i', strtotime($naloga['rok_oddaje'])); ?></span></p>
+    <?php else: ?>
+        <h2>Objavi Novo Nalogo</h2>
+    <?php endif; ?>
+    
+    <?php if (!empty($seznam_nalog)): ?>
+        <label for="naloga-select" style="display: block; margin-top: 15px; font-weight: bold;">Izberi nalogo iz arhiva:</label>
+        <select id="naloga-select" style="padding: 8px; width: 100%; margin-top: 5px;">
+            <option value="" <?php echo empty($naloga) ? 'selected' : ''; ?>>-- Prikaz zadnje naloge / Obrazec za novo nalogo --</option>
+            <?php foreach ($seznam_nalog as $arhivirana_naloga): ?>
+                <option 
+                    value="<?php echo $arhivirana_naloga['id_naloga']; ?>" 
+                    <?php echo (!empty($naloga) && $naloga['id_naloga'] == $arhivirana_naloga['id_naloga']) ? 'selected' : ''; ?>
+                >
+                    <?php echo htmlspecialchars($arhivirana_naloga['naslov']); ?> (Rok: <?php echo date('d.m.Y H:i', strtotime($arhivirana_naloga['rok_oddaje'])); ?>)
                 </option>
             <?php endforeach; ?>
-        <?php endif; ?>
-    </select>
+        </select>
+    <?php endif; ?>
 </div>
-<hr>
-
 
 <?php if (!empty($naloga)): ?>
-    
-    <div class="naloga-detajli-container" style="margin-bottom: 30px;">
-        <div style="border: 2px solid #007bff; padding: 15px; margin-bottom: 20px; border-radius: 8px;">
-            <h3 style="color: #007bff;">Trenutno Pregledovana Naloga: <?php echo htmlspecialchars($naloga['naslov']); ?></h3>
-            <p><strong>Objavljeno:</strong> <?php echo date('d.m.Y H:i', strtotime($naloga['datum_objave'])); ?></p>
-            <p style="color: red; font-weight: bold;"><strong>Rok oddaje:</strong> <?php echo date('d.m.Y H:i', strtotime($naloga['rok_oddaje'])); ?></p>
-            <p><strong>Opis:</strong></p>
-            <div style="border-left: 3px solid #ccc; padding-left: 10px; margin-bottom: 15px;"><?php echo nl2br(htmlspecialchars($naloga['opis_naloge'])); ?></div>
-            
-            <?php if ($naloga['pot_na_strezniku']): ?>
-                <p>Priložena datoteka: <a href="<?php echo htmlspecialchars($naloga['pot_na_strezniku']); ?>" target="_blank">Prenesi datoteko naloge</a></p>
-            <?php endif; ?>
 
-            <button data-id-naloga="<?php echo $naloga['id_naloga']; ?>" class="izbrisi-nalogo-btn" style="background: red; color: white; border: none; padding: 8px 15px; cursor: pointer; margin-top: 10px;">
-                Izbriši to nalogo (VKLJUČNO z oddajami!)
-            </button>
-        </div>
-
-        <h4 style="margin-top: 20px;">Oddaje Učencev</h4>
+    <div class="naloga-detajli" style="margin-bottom: 20px; padding: 15px; border: 1px solid #ddd;">
+        <p><strong>Opis:</strong></p>
+        <div style="white-space: pre-wrap; margin-bottom: 15px;"><?php echo htmlspecialchars($naloga['opis_naloge'] ?? 'Brez opisa.'); ?></div>
         
-        <div class="oddaje-table-wrapper" style="overflow-x: auto;">
-            <table style="width: 100%; border-collapse: collapse; min-width: 600px;">
-                <thead>
-                    <tr style="background: #f2f2f2;">
-                        <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Učenec</th>
-                        <th style="padding: 10px; border: 1px solid #ddd; text-align: center;">Status</th>
-                        <th style="padding: 10px; border: 1px solid #ddd; text-align: center;">Datum Oddaje</th>
-                        <th style="padding: 10px; border: 1px solid #ddd; text-align: center;">Ocena</th>
-                        <th style="padding: 10px; border: 1px solid #ddd; text-align: center;">Akcija</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php 
-                    foreach ($ucenci_za_prikaz as $podatki): 
-                        // Barva statusa (Logika ostaja ista kot prej)
-                        $barva = 'gray';
-                        $status_oddaje = $podatki['status'];
-                        if ($status_oddaje === 'Oddano') {
-                            $barva = 'orange';
-                        } elseif ($status_oddaje === 'Ocenjeno') {
-                            $barva = 'green';
-                        } elseif ($status_oddaje === 'Ni oddano') {
-                            // Če ni oddano, preverimo rok
-                            $rok_oddaje_passed = (new DateTime() > new DateTime($naloga['rok_oddaje']));
-                            $barva = $rok_oddaje_passed ? 'darkred' : 'gray';
-                            $status_oddaje = $rok_oddaje_passed ? 'ZAMUDA' : 'Ni oddano';
-                        }
-                    ?>
-                    <tr>
-                        <td style="padding: 8px; border: 1px solid #ddd;"><?php echo htmlspecialchars($podatki['ime'] . ' ' . $podatki['priimek']); ?></td>
-                        <td style="padding: 8px; border: 1px solid #ddd; text-align: center; color: white; background-color: <?php echo $barva; ?>; font-weight: bold;"><?php echo htmlspecialchars($status_oddaje); ?></td>
-                        <td style="padding: 8px; border: 1px solid #ddd; text-align: center;"><?php echo $podatki['datum_oddaje'] ? date('d.m.Y H:i', strtotime($podatki['datum_oddaje'])) : '-'; ?></td>
-                        <td style="padding: 8px; border: 1px solid #ddd; text-align: center; font-weight: bold;"><?php echo htmlspecialchars($podatki['ocena'] ?? '-'); ?></td>
-                        <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">
-                            <?php if (isset($podatki['id_oddaja'])): ?>
-                                <button 
-                                    data-oddaja-id="<?php echo $podatki['id_oddaja']; ?>" 
-                                    data-ucenec-ime="<?php echo htmlspecialchars($podatki['ime'] . ' ' . $podatki['priimek']); ?>"
-                                    class="pregled-oddaje-btn"
-                                    style="background: #007bff; color: white; border: none; padding: 5px 10px; cursor: pointer;">
-                                    Pregled/Oceni
-                                </button>
-                            <?php else: ?>
-                                -
-                            <?php endif; ?>
-                        </td>
-                    </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
-        </div>
+        <?php if ($naloga['pot_na_strezniku']): ?>
+            <p><strong>Priložena datoteka:</strong> <a href="<?php echo htmlspecialchars($naloga['pot_na_strezniku']); ?>" target="_blank">Prenesi datoteko naloge</a></p>
+        <?php endif; ?>
         
+        <button 
+            data-id-naloga="<?php echo $naloga['id_naloga']; ?>" 
+            id="delete-naloga-btn" 
+            style="background: #dc3545; color: white; border: none; padding: 10px 15px; cursor: pointer; margin-top: 20px;">
+            Izbriši to nalogo in vse oddaje učencev
+        </button>
     </div>
+
+
+    <h3 style="margin-top: 30px;">Oddaje Učencev (Skupaj: <?php echo count($ucenci_za_prikaz); ?>)</h3>
+    <table style="width: 100%; border-collapse: collapse;">
+        <thead>
+            <tr style="background-color: #eee;">
+                <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Učenec</th>
+                <th style="padding: 10px; border: 1px solid #ddd; text-align: center;">Status</th>
+                <th style="padding: 10px; border: 1px solid #ddd; text-align: center;">Datum Oddaje</th>
+                <th style="padding: 10px; border: 1px solid #ddd; text-align: center;">Ocena</th>
+                <th style="padding: 10px; border: 1px solid #ddd; text-align: center;">Akcija</th>
+            </tr>
+        </thead>
+        <tbody>
+            <?php foreach ($ucenci_za_prikaz as $podatki): 
+                $status_oddaje = htmlspecialchars($podatki['status'] ?? 'Ni oddano');
+                $barva = 'gray';
+                if ($status_oddaje === 'Oddano') {
+                    $barva = '#007bff'; // Modra
+                } elseif ($status_oddaje === 'Ocenjeno') {
+                    $barva = '#28a745'; // Zelena
+                } elseif ($status_oddaje === 'Ni oddano') {
+                    $barva = '#dc3545'; // Rdeča
+                }
+            ?>
+            <tr>
+                <td style="padding: 8px; border: 1px solid #ddd;"><?php echo htmlspecialchars($podatki['ime'] . ' ' . $podatki['priimek']); ?></td>
+                <td style="padding: 8px; border: 1px solid #ddd; text-align: center; color: white; background-color: <?php echo $barva; ?>; font-weight: bold;"><?php echo $status_oddaje; ?></td>
+                <td style="padding: 8px; border: 1px solid #ddd; text-align: center;"><?php echo $podatki['datum_oddaje'] ? date('d.m.Y H:i', strtotime($podatki['datum_oddaje'])) : '-'; ?></td>
+                <td style="padding: 8px; border: 1px solid #ddd; text-align: center; font-weight: bold;"><?php echo htmlspecialchars($podatki['ocena'] ?? '-'); ?></td>
+                <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">
+                    <?php if (isset($podatki['id_oddaja'])): ?>
+                        <button 
+                            data-oddaja-id="<?php echo $podatki['id_oddaja']; ?>" 
+                            data-ucenec-ime="<?php echo htmlspecialchars($podatki['ime'] . ' ' . $podatki['priimek']); ?>"
+                            class="pregled-oddaje-btn"
+                            style="background: #007bff; color: white; border: none; padding: 5px 10px; cursor: pointer;">
+                            Pregled/Oceni
+                        </button>
+                    <?php else: ?>
+                        -
+                    <?php endif; ?>
+                </td>
+            </tr>
+            <?php endforeach; ?>
+        </tbody>
+    </table>
+
+<?php else: ?>
+
+    <p style="color: red; font-weight: bold;">Trenutno ni nobene aktivne naloge za ta predmet. Objavite novo spodaj.</p>
+    
+    <h3 style="margin-top: 30px;">Objavi Novo Nalogo</h3>
+    <form id="naloga-form" method="POST" enctype="multipart/form-data">
+        
+        <input type="hidden" name="id_predmet" value="<?php echo htmlspecialchars($id_predmet); ?>"> 
+
+        <div>
+            <label for="naslov">Naslov naloge:</label>
+            <input type="text" id="naslov" name="naslov" required style="width: 100%; padding: 8px; margin-bottom: 10px;">
+        </div>
+        
+        <div>
+            <label for="rok_oddaje">Rok oddaje:</label>
+            <input type="datetime-local" id="rok_oddaje" name="rok_oddaje" required style="width: 100%; padding: 8px; margin-bottom: 10px;">
+        </div>
+        
+        <div>
+            <label for="opis_naloge">Opis naloge:</label>
+            <textarea id="opis_naloge" name="opis_naloge" rows="8" style="width: 100%; padding: 8px; margin-bottom: 10px;"></textarea>
+        </div>
+        
+        <div>
+            <label for="datoteka">Priloži datoteko (opcija):</label>
+            <input type="file" id="datoteka" name="datoteka" style="margin-bottom: 15px;">
+        </div>
+
+        <button type="submit" style="background: #28a745; color: white; border: none; padding: 10px 15px; cursor: pointer; width: 100%;">Objavi Nalogo</button>
+    </form>
     
 <?php endif; ?>
 
-<hr style="margin-top: 30px; border-color: green;">
-<h3 style="color: green;">Kreiraj NOVO Nalogo</h3>
-
-<form id="naloga-form" method="POST" enctype="multipart/form-data">
-    
-    <input type="hidden" name="id_predmet" value="<?php echo htmlspecialchars($id_predmet); ?>"> 
-
-    <div>
-        <label for="naslov">Naslov naloge:</label>
-        <input type="text" id="naslov" name="naslov" required style="width: 100%; padding: 8px; margin-bottom: 10px;">
-    </div>
-    
-    <div>
-        <label for="rok_oddaje">Rok oddaje:</label>
-        <input type="datetime-local" id="rok_oddaje" name="rok_oddaje" required style="width: 100%; padding: 8px; margin-bottom: 10px;">
-    </div>
-    
-    <div>
-        <label for="opis_naloge">Opis naloge:</label>
-        <textarea id="opis_naloge" name="opis_naloge" rows="8" style="width: 100%; padding: 8px; margin-bottom: 10px;"></textarea>
-    </div>
-    
-    <div>
-        <label for="datoteka">Priloži datoteko (opcija):</label>
-        <input type="file" id="datoteka" name="datoteka" style="margin-bottom: 15px;">
-    </div>
-    
-    <button type="submit" style="background: green; color: white; border: none; padding: 10px 20px; cursor: pointer; font-size: 16px;">Objavi Nalogo</button>
-
-</form>
-
 <script>
-    // Poslušalec za GUMB IZBRIŠI NALOGO (Ostaja enak kot prej)
-    const deleteBtn = document.querySelector('.izbrisi-nalogo-btn');
+    // Poslušalec za GUMB za brisanje naloge (če je ta del naloga naložen)
+    const deleteBtn = document.getElementById('delete-naloga-btn');
     if (deleteBtn) {
-        deleteBtn.addEventListener('click', async function(e) {
-            e.preventDefault();
-            const idNaloga = this.dataset.idNaloga;
+        deleteBtn.addEventListener('click', async function() {
+            const idNaloga = deleteBtn.dataset.idNaloga;
             
             if (!confirm("Ali ste prepričani, da želite IZBRISATI to nalogo in VSE oddaje učencev zanjo? Ta akcija je NEPOVRATNA!")) {
                 return;
@@ -213,6 +198,7 @@ if (!empty($naloga)) {
             deleteBtn.textContent = 'Brisanje...';
 
             try {
+                // Ta klic zahteva, da imate datoteko ajax_naloga_delete.php, ki je v vašem primeru bila ustrezna.
                 const response = await fetch('ajax_naloga_delete.php', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -223,7 +209,8 @@ if (!empty($naloga)) {
                 alert(result.message);
                 
                 if (result.success) {
-                    // Ponovno naloži detajle: klik na aktiven predmet
+                    // Ponovno naloži detajle, ki bodo zdaj prazni (ali bo prikazal prejšnjo nalogo)
+                    // KLJUČNO: Kliče funkcijo iz učitelj_ucilnica.php, ki naloži vsebino.
                     document.querySelector('.predmet-item.active').click(); 
                 } else {
                     deleteBtn.disabled = false;
@@ -251,8 +238,16 @@ if (!empty($naloga)) {
                 const imePredmeta = activeItem.dataset.imePredmeta;
                 const imeUcitelja = activeItem.dataset.imeUcitelja;
                 
-                // Kliči funkcijo, ki naloži vsebino, in ji dodaj ID izbrane naloge
-                loadSubjectContent(idPredmet, idUcitelja, imePredmeta, imeUcitelja, idNaloga);
+                // Opomba: Predpostavljamo, da imate globalno funkcijo 'loadSubjectContent' ali 'loadSubjectDetails'
+                // v vaši datoteki 'ucitelj_ucilnica.php', ki je na voljo.
+                // Tukaj kličemo funkcijo in ji POSREDUJEMO id_naloga_specificna
+                if (idNaloga) {
+                    // Naloži specifično nalogo
+                    loadSubjectContent(idPredmet, idUcitelja, imePredmeta, imeUcitelja, idNaloga);
+                } else {
+                    // Naloži zadnjo nalogo (ali prikaže formo za novo)
+                    loadSubjectContent(idPredmet, idUcitelja, imePredmeta, imeUcitelja, null); 
+                }
             }
         });
     }
