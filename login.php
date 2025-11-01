@@ -6,19 +6,21 @@ $error_message = '';
 
 // Quick redirect for already logged-in users
 if (isset($_SESSION['user_id']) && isset($_SESSION['vloga'])) {
-    if ($_SESSION['vloga'] === 'admin') { // DODANO: Admin gre naravnost na adminPage
+    if ($_SESSION['vloga'] === 'admin') { 
         header('Location: adminPage.php');
         exit();
     }
     if ($_SESSION['vloga'] === 'ucitelj') {
-        header('Location: ucilnicaPage.php');
+        // PREUSMERITEV ZA UČITELJA NA NOVO STRAN
+        header('Location: ucitelj_ucilnica.php'); 
         exit();
     } elseif ($_SESSION['vloga'] === 'ucenec') {
         if ($_SESSION['prvi_vpis'] == 1) {
             header('Location: predmetiPage.php');
             exit();
         } else {
-            header('Location: ucilnicaPage.php');
+            // PREUSMERITEV ZA UČENCA NA NOVO STRAN
+            header('Location: ucenec_ucilnica.php'); 
             exit();
         }
     }
