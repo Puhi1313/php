@@ -14,19 +14,31 @@ $id_oddaja = $_POST['id_oddaja'] ?? null;
 $ocena = trim($_POST['ocena'] ?? '');
 $komentar_ucitelj = trim($_POST['komentar_ucitelj'] ?? '');
 
+$ocena_up = strtoupper($ocena);
+
+// NOVA LOGIKA ZA DOLOČITEV STATUSA
+// Če je ocena '1' ali 'ND' (Nezadostno/Dopolnitev), nastavimo status nazaj na 'Oddano'.
+// To omogoči učencu, da posodobi nalogo (posodobitev oddaje).
+if ($ocena_up === '1' || $ocena_up === 'ND') {
+    $status = 'Oddano'; // Dovolimo ponovno oddajo/posodobitev
+} else {
+    $status = 'Ocenjeno'; // Zaklenemo
+}
+
 if (empty($id_oddaja) || empty($ocena)) {
     echo json_encode(["success" => false, "message" => "Manjkata ID oddaje ali ocena."]);
     exit;
 }
 
 try {
-    $sql_update = "UPDATE oddaja SET ocena = ?, komentar_ucitelj = ?, status = 'Ocenjeno' WHERE id_oddaja = ?";
+    // Posodobitev v bazi
+    $sql_update = "UPDATE oddaja SET ocena = ?, komentar_ucitelj = ?, status = ? WHERE id_oddaja = ?";
     $stmt_update = $pdo->prepare($sql_update);
-    $stmt_update->execute([$ocena, $komentar_ucitelj, $id_oddaja]);
-    
-    echo json_encode(["success" => true, "message" => "Ocena uspešno shranjena!"]);
+    $stmt_update->execute([$ocena, $komentar_ucitelj, $status, $id_oddaja]);
+
+    echo json_encode(["success" => true, "message" => "Oddaja uspešno ocenjena in status posodobljen na: " . $status]);
 
 } catch (\PDOException $e) {
+    error_log("Napaka ocenjevanja: " . $e->getMessage());
     echo json_encode(["success" => false, "message" => "Napaka baze: " . $e->getMessage()]);
 }
-?>

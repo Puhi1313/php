@@ -53,18 +53,29 @@ try {
 <!DOCTYPE html>
 <html lang="sl">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=BBH+Sans+Hegarty&family=Climate+Crisis:YEAR@2009&display=swap" rel="stylesheet">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Izberi Predmete</title>
   <style>
-    /* ... stil iz tvoje datoteke ... */
     body {
       margin: 0;
-      font-family: Arial, sans-serif;
-      background: #eafaff;
+      font-family: "BBH Sans Hegarty", sans-serif;
+      /*background: #f4f6f9;*/
+    }
+    .video-background {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      z-index: -1;
     }
     header {
-      background: #ddd;
+      background: #cdcdb6;
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -84,7 +95,7 @@ try {
       text-decoration: underline;
     }
     .hero {
-      background: #baf0ff;
+      color: #3b3d15;
       padding: 50px;
       text-align: center;
       min-height: 80vh;
@@ -97,7 +108,10 @@ try {
       font-size: 26px;
     }
     .card {
-      background: #ccc;
+      background: #cdcdb6;
+      border-style: solid;
+      border-color: #3b3d15;
+      color: #3b3d15;
       border-radius: 20px;
       padding: 30px;
       max-width: 700px;
@@ -112,19 +126,19 @@ try {
       gap: 15px;
     }
     .subject {
-        background: #66ff66;
+        background: #80852f;
         border-radius: 8px;
         padding: 12px;
         font-size: 16px;
         font-weight: bold;
-        cursor: default;
+        cursor: pointer;
         transition: transform 0.2s;
-        position: relative;
+        /* naj bo nad osnovnim ozadjem */
     }
-    .subject.selected {
-        background: #32CD32;
-        color: white;
+    .subject:hover {
+      transform: scale(1.05);
     }
+    /* Dropdown meni */
     .dropdown {
         position: absolute;
         top: 100%;
@@ -137,10 +151,7 @@ try {
         list-style: none;
         padding: 0;
         margin: 0 0 0 0;
-        z-index: 10;
-        text-align: left;
-        font-weight: normal;
-        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        /* poskrbi da dropdown skoči v ospredje */
     }
     .dropdown li {
       padding: 8px;
@@ -149,19 +160,11 @@ try {
     .dropdown li:hover {
       background: #f0f0f0;
     }
+    /* Pokaži dropdown ob hoverju */
     .subject:hover .dropdown {
       display: block;
     }
-    #finish-selection {
-        margin-top: 30px;
-        padding: 10px 20px;
-        font-size: 18px;
-        cursor: pointer;
-        background: #007bff;
-        color: white;
-        border: none;
-        border-radius: 5px;
-    }
+  </style>
   </style>
 </head>
 <body>
