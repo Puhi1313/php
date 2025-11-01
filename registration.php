@@ -105,7 +105,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 10px 20px;
+      padding: 15px 30px;
     }
     header .logo {
       font-weight: bold;
@@ -123,55 +123,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     .container {
       display: flex;
       justify-content: center;
-      margin-top: 50px; /* Zmanjšano za boljši prikaz */
-      min-height: calc(100vh - 70px); /* Da pokrije celotno višino */
+      margin-top: 150px;
     }
 
     .form-wrapper {
       background: #ffffff;
       display: flex;
-      max-width: 900px;
-      width: 90%;
-      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-      border-radius: 8px;
+      border-radius: 12px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.1);
       overflow: hidden;
-      margin-bottom: 20px; /* Dodan rob spodaj */
+      width: 800px;
     }
 
     .form-left {
       flex: 1;
       padding: 40px;
+      background: #cdcdb6;
     }
-
     .form-left h2 {
       margin-top: 0;
-      margin-bottom: 25px;
-      color: #333;
+      margin-bottom: 20px;
+      text-align: center;
+      color: #3b3d15;
     }
-
     .form-left label {
       display: block;
-      margin-bottom: 5px;
-      font-weight: bold;
-      color: #555;
+      margin-bottom: 6px;
+      font-size: 14px;
+      color: #3b3d15;
     }
-
-    .form-left input[type="text"],
-    .form-left input[type="email"],
-    .form-left input[type="password"] {
+    .form-left input {
       width: 100%;
       padding: 10px;
-      margin-bottom: 15px;
+      margin-bottom: 20px;
       border: 1px solid #ccc;
-      border-radius: 4px;
-      box-sizing: border-box;
+      border-radius: 6px;
+      font-size: 14px;
     }
-
     .form-left button {
       width: 100%;
       padding: 12px;
-      margin-top: 10px;
-      background: #2c3e50;
+      background: #596235;
       color: white;
       border: none;
       border-radius: 6px;
@@ -185,29 +177,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     .form-right {
       flex: 1;
       background-image: url("slike/corporate_memphis1.png");
-      background-size: cover;
       display: flex;
       align-items: center;
       justify-content: center;
       font-size: 18px;
       color: #666;
-    }
-
-    .error-message {
-      color: red;
-      font-weight: bold;
-      margin-bottom: 15px;
-      text-align: center;
-    }
-    .success-message {
-      color: green;
-      font-weight: bold;
-      margin-bottom: 15px;
-      text-align: center;
-      padding: 10px;
-      border: 1px solid green;
-      background-color: #e6ffe6;
-      border-radius: 4px;
     }
   </style>
 </head>
