@@ -4,7 +4,6 @@
 $host = 'localhost'; // Ali ip naslov strežnika
 $db   = 'redovalnica_test1'; // Ime tvoje baze
 $user = 'root'; // Uporabniško ime (če uporabljaš XAMPP/WAMP, je to običajno 'root')
-<<<<<<< HEAD
 $pass = ''; //
 $charset = 'utf8mb4';
 
