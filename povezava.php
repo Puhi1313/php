@@ -3,8 +3,8 @@
 // Nastavitve za bazo podatkov
 $host = 'localhost'; // Ali ip naslov strežnika
 $db   = 'redovalnica_test1'; // Ime tvoje baze
-$user = 'phpmyadmin'; // Uporabniško ime (če uporabljaš XAMPP/WAMP, je to običajno 'root')
-$pass = 'pass'; // Geslo (če uporabljaš XAMPP/WAMP, je to običajno prazno)
+$user = 'root'; // Uporabniško ime (če uporabljaš XAMPP/WAMP, je to običajno 'root')
+$pass = '';// Geslo (če uporabljaš XAMPP/WAMP, je to običajno prazno)
 $charset = 'utf8mb4';
 
 $dsn = "mysql:host=$host;dbname=$db;charset=$charset";
