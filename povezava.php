@@ -19,6 +19,8 @@ try {
      $pdo = new PDO($dsn, $user, $pass, $options);
 } catch (\PDOException $e) {
      // V primeru napake izpišemo napako in prekinemo izvajanje
-     throw new \PDOException($e->getMessage(), (int)$e->getCode());
+     // throw new \PDOException($e->getMessage(), (int)$e->getCode());
+     http_response_code(500); // Nastavi kodo napake
+     die("NAPAKA: Povezava z bazo ni uspela."); // Izpiše prijazno sporočilo
 }
 ?>

@@ -14,7 +14,7 @@ $predmeti_ucenec = [];
 $vse_naloge_ucenec = [];
 
 try {
-    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    // $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
     // 1. Pridobitev imena
     $sql_ime = "SELECT ime, priimek FROM uporabnik WHERE id_uporabnik = ?";
@@ -25,379 +25,708 @@ try {
 
     // 2. Pridobitev vseh predmetov, ki jih ima učenec
     $sql_predmeti = "
-        SELECT DISTINCT p.id_predmet, p.ime_predmeta, u.id_uporabnik AS id_ucitelja, u.ime AS ime_ucitelja, u.priimek AS priimek_ucitelja
-        FROM ucenec_predmet up
-        JOIN predmet p ON up.id_predmet = p.id_predmet
-        JOIN uporabnik u ON up.id_ucitelj = u.id_uporabnik
-        WHERE up.id_ucenec = ?
-        ORDER BY p.ime_predmeta
+        SELECT DISTINCT p.id_predmet, p.ime_predmeta, 
+            u.id_uporabnik AS id_ucitelja, u.ime AS ime_ucitelja, u.priimek AS priimek_ucitelja
+        FROM ucenec_predmet ucp  -- Začnemo s to tabelo za boljši fokus
+        INNER JOIN predmet p ON ucp.id_predmet = p.id_predmet
+        INNER JOIN ucitelj_predmet upr ON p.id_predmet = upr.id_predmet -- POPRAVLJENO IME TABELE IN ALIAS (upr)
+        INNER JOIN uporabnik u ON upr.id_ucitelj = u.id_uporabnik 
+        WHERE ucp.id_ucenec = ?  -- SAMO EN VPRASAJ (Placeholder)
+        ORDER BY p.ime_predmeta ASC
     ";
     $stmt_predmeti = $pdo->prepare($sql_predmeti);
     $stmt_predmeti->execute([$user_id]);
     $predmeti_ucenec = $stmt_predmeti->fetchAll();
-    
-    // 3. Pridobitev vseh nalog in oddaj učenca za vse njegove predmete
-    // Združimo naloge in oddaje, da lahko na PHP strani implementiramo logiko 7-dnevnega podaljšanja
-    $sql_vse_naloge = "
+
+    // 3. Pridobitev vseh nalog za te predmete
+    // Vključuje tudi status oddaje (ali NULL, če ni oddano) in podatke o oceni.
+    $sql_naloge = "
         SELECT 
-            n.id_naloga, n.naslov, n.opis_naloge, n.rok_oddaje, n.datum_objave, 
-            p.ime_predmeta, p.id_predmet,
+            n.id_naloga, n.naslov, n.opis_naloge, n.rok_oddaje, n.id_predmet, n.id_ucitelj, n.pot_na_strezniku AS naloga_datoteka,
+            p.ime_predmeta, 
             u.ime AS ime_ucitelja, u.priimek AS priimek_ucitelja,
-            o.id_oddaja, o.datum_oddaje, o.ocena, o.status, o.komentar_ucitelj
+            o.id_oddaja, o.datum_oddaje, o.besedilo_oddaje, o.pot_na_strezniku AS oddaja_datoteka, o.status, o.ocena, o.komentar_ucitelj
         FROM naloga n
         JOIN predmet p ON n.id_predmet = p.id_predmet
         JOIN uporabnik u ON n.id_ucitelj = u.id_uporabnik
-        JOIN ucenec_predmet up ON n.id_predmet = up.id_predmet AND n.id_ucitelj = up.id_ucitelj
-        LEFT JOIN oddaja o ON n.id_naloga = o.id_naloga AND o.id_ucenec = ?
-        WHERE up.id_ucenec = ?
-        ORDER BY n.rok_oddaje DESC
+        -- Uporabimo ? namesto :user_id (1. parameter)
+        JOIN ucenec_predmet up ON n.id_predmet = up.id_predmet AND up.id_ucenec = ? 
+        -- Uporabimo ? namesto :user_id (2. parameter)
+        LEFT JOIN oddaja o ON n.id_naloga = o.id_naloga AND o.id_ucenec = ? AND o.status IN ('Oddano', 'Ocenjeno')
+        WHERE o.id_oddaja IS NULL OR o.id_oddaja = (
+            -- Subquery za pridobitev zadnje veljavne oddaje
+            SELECT id_oddaja FROM oddaja 
+            -- Uporabimo ? namesto :user_id (3. parameter)
+            WHERE id_naloga = n.id_naloga AND id_ucenec = ? 
+            ORDER BY datum_oddaje DESC LIMIT 1
+        )
+        ORDER BY n.rok_oddaje DESC;
     ";
-    $stmt_naloge = $pdo->prepare($sql_vse_naloge);
-    $stmt_naloge->execute([$user_id, $user_id]);
-    $vse_naloge_raw = $stmt_naloge->fetchAll();
-
-    $aktivne_naloge = [];
-    $oddane_naloge = [];
-    $danes = new DateTime();
-
-    foreach ($vse_naloge_raw as $naloga) {
-        $rok_oddaje_original = new DateTime($naloga['rok_oddaje']);
-        $rok_oddaje_dejanski = clone $rok_oddaje_original;
-
-        $je_oddano = !empty($naloga['id_oddaja']);
-        $status = $naloga['status'];
-        $ocena = $naloga['ocena'];
-        
-        $podaljsan_rok = false;
-
-        // Logika 7-dnevnega podaljšanja roka po oceni 'ND' (Ni Dopolnjeno)
-        if ($je_oddano && strtoupper($ocena) === 'ND') {
-            // Če je ocena ND, podaljšamo rok za 7 dni, štet od originalnega roka.
-            $rok_oddaje_dejanski = clone $rok_oddaje_original;
-            $rok_oddaje_dejanski->modify('+7 days');
-            $podaljsan_rok = true;
-        }
-
-        $je_aktivna = false;
-
-        if (!$je_oddano && $danes < $rok_oddaje_original) {
-            // 1. Še ni oddano in rok ni potekel.
-            $je_aktivna = true;
-        } elseif ($je_oddano && strtoupper($ocena) === 'ND' && $danes < $rok_oddaje_dejanski) {
-            // 2. Oddano, ocena ND in podaljšan rok ni potekel.
-            $je_aktivna = true;
-        }
-
-        if ($je_aktivna) {
-            $naloga['rok_oddaje_prikaz'] = $podaljsan_rok ? $rok_oddaje_dejanski->format('d.m.Y H:i') . ' (Podaljšano)' : $rok_oddaje_original->format('d.m.Y H:i');
-            $aktivne_naloge[] = $naloga;
-        }
-
-        if ($je_oddano) {
-            $oddane_naloge[] = $naloga;
-        }
-    }
+    
+    $stmt_naloge = $pdo->prepare($sql_naloge);
+    
+    // KLJUČNA SPREMEMBA: Posredujemo vrednost $user_id trikrat, za vsak ?
+    $stmt_naloge->execute([$user_id, $user_id, $user_id]); 
+    
+    $vse_naloge_ucenec = $stmt_naloge->fetchAll();
 
 } catch (\PDOException $e) {
-    error_log("Database Error (Učenec): " . $e->getMessage()); 
-    die("Prišlo je do napake v sistemu. Prosimo, poskusite kasneje.");
+    // ** TA CATCH BLOK JE KLJUČEN ZA DEBUGIRANJE **
+    // Če ta koda pri učencu ne dela, je SQL poizvedba napačna.
+    http_response_code(500);
+    // IZPIŠITE DEJANSKO NAPAKO ZA POPRAVEK
+    die("NAPAKA V UČENEC_UCILNICA.PHP: Poizvedba baze ni uspela. " . $e->getMessage());
 }
+
+// Funkcija za določitev statusa naloge na podlagi rokov in oddaje
+function get_naloga_status($naloga) {
+    $rok_oddaje = new DateTime($naloga['rok_oddaje']);
+    $danes = new DateTime();
+    $je_prepozno = $danes > $rok_oddaje;
+
+    // Pridobitev roka za dopolnitev (če obstaja) - zaenkrat predpostavljamo, da je rok oddaje tudi rok za dopolnitev,
+    // razen če se v oddaji ne shrani nov rok. Ker v oddaji ni novega roka, uporabimo rok naloge
+    
+    $status = 'Nova naloga'; // Privzeti status
+
+    if ($naloga['status'] === 'Ocenjeno') {
+        if (strtoupper($naloga['ocena'] ?? '') === 'ND') {
+            return [
+                'status' => 'Za dopolnitev',
+                'barva' => 'orange',
+                'ikona' => '⚠️'
+            ];
+        } else {
+            return [
+                'status' => 'Ocenjeno (' . htmlspecialchars($naloga['ocena']) . ')',
+                'barva' => 'green',
+                'ikona' => '✅'
+            ];
+        }
+    } elseif ($naloga['status'] === 'Oddano') {
+        return [
+            'status' => 'Oddano (Čaka na oceno)',
+            'barva' => 'blue',
+            'ikona' => '📝'
+        ];
+    } elseif ($je_prepozno) {
+        return [
+            'status' => 'Pretečen rok',
+            'barva' => 'red',
+            'ikona' => '❌'
+        ];
+    } else {
+        return [
+            'status' => $status,
+            'barva' => 'gray',
+            'ikona' => '🌟'
+        ];
+    }
+}
+
+// Filtriranje nalog
+$naloge_nova = []; // Nova naloga, Za dopolnitev, Pretečen rok
+$naloge_oddano = []; // Oddano (Čaka na oceno)
+$naloge_ocenjeno = []; // Ocenjeno
+
+foreach ($vse_naloge_ucenec as $naloga) {
+    $status_data = get_naloga_status($naloga);
+    $naloga['status_info'] = $status_data;
+    $naloga['je_prepozno'] = new DateTime() > new DateTime($naloga['rok_oddaje']);
+
+    if ($status_data['status'] === 'Oddano (Čaka na oceno)') {
+        $naloge_oddano[] = $naloga;
+    } elseif (strpos($status_data['status'], 'Ocenjeno') !== false) {
+        $naloge_ocenjeno[] = $naloga;
+    } else {
+        // Nova naloga, Za dopolnitev, Pretečen rok
+        $naloge_nova[] = $naloga;
+    }
+}
+
 ?>
+
 <!DOCTYPE html>
 <html lang="sl">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Učilnica za Učence</title>
+    <title>Učilnica - Učenec</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=BBH+Sans+Hegarty:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        /* Osnovni Stil za celoten sistem */
-        body { margin: 0; font-family: Arial, sans-serif; background: #f9f9f9; }
-        header { background: #4a86e8; color: white; display: flex; justify-content: space-between; align-items: center; padding: 15px 30px; }
-        header .logo { font-weight: bold; font-size: 18px; }
-        .container { max-width: 1200px; margin: 20px auto; padding: 0 15px; }
-        
-        /* Stil za Zavihke (Tabs) */
-        .tabs { display: flex; margin-bottom: 20px; border-bottom: 2px solid #ddd; }
-        .tab-button { 
-            padding: 10px 20px; 
-            cursor: pointer; 
-            border: none; 
-            background: none; 
-            font-size: 16px; 
-            color: #555; 
-            transition: all 0.3s;
+        body {
+            margin: 0;
+            font-family: 'BBH Sans Hegarty', sans-serif;
+            background: #f4f6f9;
+            color: #333;
         }
-        .tab-button.active { 
-            color: #4a86e8; 
-            border-bottom: 3px solid #4a86e8; 
-            font-weight: bold; 
-            background: #eef5ff;
+        header {
+            background: #cdcdb6;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 20px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
-        .tab-content { display: none; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        .tab-content.active { display: block; }
+        header .logo {
+            font-weight: bold;
+            font-size: 24px;
+            color: #1a252f;
+        }
+        nav a {
+            margin-left: 20px;
+            text-decoration: none;
+            color: #1a252f;
+            font-size: 16px;
+        }
+        nav a:hover {
+            text-decoration: underline;
+        }
+        .container {
+            display: flex;
+            max-width: 1200px;
+            margin: 20px auto;
+            background: #fff;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            min-height: 80vh;
+        }
 
-        /* Stil za Tabela */
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
-        th { background: #f0f0f0; font-weight: bold; }
-        tr:nth-child(even) { background-color: #f7f7f7; }
+        /* Glavni Menu (Predmeti) */
+        .left-menu {
+            width: 250px;
+            background: #f8f8f8;
+            padding: 20px;
+            border-right: 1px solid #ddd;
+        }
+        .left-menu h4 {
+            margin-top: 0;
+            color: #1a252f;
+            border-bottom: 2px solid #cdcdb6;
+            padding-bottom: 5px;
+            margin-bottom: 15px;
+        }
+        .predmet-item {
+            display: block;
+            padding: 10px;
+            margin-bottom: 5px;
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            text-decoration: none;
+            color: #333;
+            transition: background 0.2s, border-color 0.2s;
+            cursor: pointer;
+        }
+        .predmet-item:hover, .predmet-item.active {
+            background: #e6e6fa; /* Light purple for active/hover */
+            border-color: #cdcdb6;
+            font-weight: bold;
+        }
 
-        /* Stil za Filtre */
-        .filters { margin-bottom: 20px; padding: 15px; border: 1px solid #ddd; background: #fff; border-radius: 6px; display: flex; gap: 20px; align-items: center; }
+        /* Glavna Vsebina (Naloge in Status) */
+        .main-content {
+            flex-grow: 1;
+            padding: 20px;
+        }
+        .main-content h2 {
+            color: #1a252f;
+            border-bottom: 2px solid #cdcdb6;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
 
-        /* Statusi */
-        .status-neoddano { color: red; font-weight: bold; }
-        .status-oddano { color: orange; font-weight: bold; }
-        .status-ocenjeno { color: green; font-weight: bold; }
+        /* ZAVIHKI (Tabs) */
+        .tab-buttons {
+            display: flex;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #ddd;
+        }
+        .tab-button {
+            background: #eee;
+            border: 1px solid #ddd;
+            border-bottom: none;
+            padding: 10px 15px;
+            cursor: pointer;
+            margin-right: 5px;
+            border-radius: 5px 5px 0 0;
+            transition: background 0.3s;
+        }
+        .tab-button.active {
+            background: #fff;
+            border-color: #cdcdb6;
+            border-bottom: 2px solid #fff;
+            font-weight: bold;
+        }
+        .tab-content {
+            display: none;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-top: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Seznam nalog */
+        .naloga-list {
+            list-style: none;
+            padding: 0;
+        }
+        .naloga-item {
+            padding: 15px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-left: 5px solid;
+            border-radius: 4px;
+            background: #fff;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .naloga-item.nova { border-left-color: gray; }
+        .naloga-item.oddano { border-left-color: blue; }
+        .naloga-item.ocenjeno { border-left-color: green; }
+        .naloga-item.dopolnitev { border-left-color: orange; }
+        .naloga-item.pretecen { border-left-color: red; }
+
+        .naloga-details {
+            flex-grow: 1;
+        }
+        .naloga-details h5 {
+            margin: 0 0 5px 0;
+            font-size: 18px;
+            color: #1a252f;
+        }
+        .naloga-details p {
+            margin: 0;
+            font-size: 14px;
+            color: #666;
+        }
+
+        .naloga-status {
+            text-align: right;
+        }
+        .naloga-status .status-tag {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 15px;
+            color: white;
+            font-weight: bold;
+            font-size: 12px;
+            margin-bottom: 5px;
+        }
+        .naloga-status button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s;
+        }
+        .naloga-status button:hover {
+            background: #0056b3;
+        }
+
+        /* Modal */
+        .modal {
+            display: none; 
+            position: fixed; 
+            z-index: 1; 
+            left: 0;
+            top: 0;
+            width: 100%; 
+            height: 100%; 
+            overflow: auto; 
+            background-color: rgba(0,0,0,0.4); 
+            padding-top: 60px;
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: 5% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%; 
+            max-width: 700px;
+            border-radius: 8px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+        .close-btn {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+        }
+        .close-btn:hover,
+        .close-btn:focus {
+            color: #000;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        .oddaja-form label, .oddaja-form input, .oddaja-form textarea, .oddaja-form button {
+            display: block;
+            width: 100%;
+            box-sizing: border-box;
+            margin-bottom: 10px;
+        }
+        .oddaja-form textarea {
+            min-height: 150px;
+        }
+        .oddaja-form button[type="submit"] {
+            background-color: #28a745;
+            color: white;
+            padding: 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .oddaja-form button[type="submit"]:hover:not(:disabled) {
+            background-color: #218838;
+        }
+        .oddaja-form button[type="submit"]:disabled {
+            background-color: #999;
+            cursor: not-allowed;
+        }
     </style>
 </head>
 <body>
 
 <header>
-    <div class="logo">UČILNICA</div>
-    <div>Prijavljen: **<?= htmlspecialchars($ime_priimek) ?>** (Učenec) | <a href="logout.php" style="color: #ffdddd;">Odjava</a></div>
+    <div class="logo">E-Učilnica</div>
+    <nav>
+        <span>Pozdravljen, <?php echo htmlspecialchars($ime_priimek); ?> (Učenec)</span>
+        <a href="logout.php">Odjava</a>
+    </nav>
 </header>
 
 <div class="container">
-    <h2>Moja Učilnica</h2>
-    
-    <div style="margin-bottom: 30px; padding: 15px; background: #eef; border-left: 5px solid #4a86e8; border-radius: 4px;">
-        <strong>Tvoji predmeti:</strong> 
-        <?php 
-            $predmet_imena = array_column($predmeti_ucenec, 'ime_predmeta');
-            echo implode(', ', array_unique($predmet_imena)); 
-        ?>
+    <div class="left-menu">
+        <h4>Predmeti</h4>
+        <?php if (empty($predmeti_ucenec)): ?>
+            <p>Nimate dodeljenih predmetov.</p>
+        <?php else: ?>
+            <?php foreach ($predmeti_ucenec as $predmet): ?>
+                <a href="#" class="predmet-item"
+                   data-id-predmet="<?php echo htmlspecialchars($predmet['id_predmet']); ?>"
+                   data-ime-predmeta="<?php echo htmlspecialchars($predmet['ime_predmeta']); ?>">
+                    <?php echo htmlspecialchars($predmet['ime_predmeta']); ?>
+                    <small style="display: block; color: #888;">Učitelj: <?php echo htmlspecialchars($predmet['ime_ucitelja'] . ' ' . $predmet['priimek_ucitelja']); ?></small>
+                </a>
+            <?php endforeach; ?>
+        <?php endif; ?>
     </div>
     
-    <div class="tabs">
-        <button class="tab-button active" onclick="openTab(event, 'aktivne')">Aktivne Naloge (<?= count($aktivne_naloge) ?>)</button>
-        <button class="tab-button" onclick="openTab(event, 'oddane')">Oddaje in Ocene (<?= count($oddane_naloge) ?>)</button>
-    </div>
+    <div class="main-content">
+        <h2>Pregled nalog</h2>
 
-    <div id="aktivne" class="tab-content active">
-        <h3>Aktivne Naloge</h3>
-        
-        <div class="filters">
-            <label for="filter-predmet-aktivne">Filtriraj po predmetu:</label>
-            <select id="filter-predmet-aktivne" onchange="filterNaloge('aktivne')">
-                <option value="">Vsi predmeti</option>
-                <?php foreach (array_unique(array_column($predmeti_ucenec, 'ime_predmeta')) as $p): ?>
-                    <option value="<?= htmlspecialchars($p) ?>"><?= htmlspecialchars($p) ?></option>
-                <?php endforeach; ?>
-            </select>
+        <div class="tab-buttons">
+            <button class="tab-button active" data-tab="nova-naloga">Neoddane / Za dopolnitev (<?php echo count($naloge_nova); ?>)</button>
+            <button class="tab-button" data-tab="oddano-caka-oceno">Oddane (<?php echo count($naloge_oddano); ?>)</button>
+            <button class="tab-button" data-tab="ocenjeno">Ocenjene (<?php echo count($naloge_ocenjeno); ?>)</button>
         </div>
 
-        <table id="tabela-aktivne">
-            <thead>
-                <tr>
-                    <th>Naslov Naloge</th>
-                    <th>Predmet</th>
-                    <th>Učitelj</th>
-                    <th>Rok Oddaje</th>
-                    <th>Status</th>
-                    <th>Akcija</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php foreach ($aktivne_naloge as $naloga): 
-                    // Določitev statusa
-                    $status_tekst = 'Ni oddano';
-                    $status_klasa = 'status-neoddano';
-                    if (!empty($naloga['id_oddaja'])) {
-                         $status_tekst = 'Oddano (Čaka na oceno)';
-                         $status_klasa = 'status-oddano';
-                         if (strtoupper($naloga['ocena']) === 'ND') {
-                            $status_tekst = 'ND - Potrebna dopolnitev (Rok podaljšan)';
-                            $status_klasa = 'status-neoddano';
-                         }
-                    }
+        <div id="nova-naloga" class="tab-content active">
+            <?php if (empty($naloge_nova)): ?>
+                <p>Odlično! Trenutno nimate novih nalog ali nalog za dopolnitev.</p>
+            <?php else: ?>
+                <ul class="naloga-list">
+                    <?php foreach ($naloge_nova as $naloga): 
+                        $class = '';
+                        if ($naloga['status_info']['status'] === 'Za dopolnitev') { $class = 'dopolnitev'; } 
+                        elseif ($naloga['je_prepozno']) { $class = 'pretecen'; } 
+                        else { $class = 'nova'; }
                     ?>
-                    <tr data-predmet="<?= htmlspecialchars($naloga['ime_predmeta']) ?>" data-datum="<?= htmlspecialchars($naloga['rok_oddaje']) ?>">
-                        <td><?= htmlspecialchars($naloga['naslov']) ?></td>
-                        <td><?= htmlspecialchars($naloga['ime_predmeta']) ?></td>
-                        <td><?= htmlspecialchars($naloga['ime_ucitelja'] . ' ' . $naloga['priimek_ucitelja']) ?></td>
-                        <td><?= htmlspecialchars($naloga['rok_oddaje_prikaz'] ?? date('d.m.Y H:i', strtotime($naloga['rok_oddaje']))) ?></td>
-                        <td class="<?= $status_klasa ?>"><?= $status_tekst ?></td>
-                        <td>
-                            <button onclick="prikaziNalogo('<?= $naloga['id_naloga'] ?>', '<?= $naloga['ime_predmeta'] ?>', '<?= $naloga['ime_ucitelja'] . ' ' . $naloga['priimek_ucitelja'] ?>')" style="padding: 5px 10px; background: #4a86e8; color: white; border: none; cursor: pointer;">
-                                Oddaj / Pregled
-                            </button>
-                        </td>
-                    </tr>
-                <?php endforeach; ?>
-            </tbody>
-        </table>
+                        <li class="naloga-item <?php echo $class; ?>">
+                            <div class="naloga-details">
+                                <h5><?php echo htmlspecialchars($naloga['naslov']); ?></h5>
+                                <p>Predmet: <?php echo htmlspecialchars($naloga['ime_predmeta']); ?> | Rok oddaje: <?php echo date('d.m.Y H:i', strtotime($naloga['rok_oddaje'])); ?></p>
+                            </div>
+                            <div class="naloga-status">
+                                <span class="status-tag" style="background-color: <?php echo $naloga['status_info']['barva']; ?>;"><?php echo $naloga['status_info']['ikona']; ?> <?php echo htmlspecialchars($naloga['status_info']['status']); ?></span>
+                                <button class="oddaja-btn" 
+                                    data-id-naloga="<?php echo htmlspecialchars($naloga['id_naloga']); ?>"
+                                    data-naslov="<?php echo htmlspecialchars($naloga['naslov']); ?>"
+                                    data-opis="<?php echo htmlspecialchars($naloga['opis_naloge']); ?>"
+                                    data-rok="<?php echo date('d.m.Y H:i', strtotime($naloga['rok_oddaje'])); ?>"
+                                    data-datoteka="<?php echo htmlspecialchars($naloga['naloga_datoteka'] ?? ''); ?>"
+                                    data-status-oddaje="<?php echo htmlspecialchars($naloga['status']); ?>"
+                                    data-ocena="<?php echo htmlspecialchars($naloga['ocena'] ?? ''); ?>"
+                                    data-oddaja-besedilo="<?php echo htmlspecialchars($naloga['besedilo_oddaje'] ?? ''); ?>"
+                                    data-oddaja-datoteka="<?php echo htmlspecialchars($naloga['oddaja_datoteka'] ?? ''); ?>"
+                                    data-komentar-ucitelj="<?php echo htmlspecialchars($naloga['komentar_ucitelj'] ?? ''); ?>"
+                                    <?php echo $naloga['je_prepozno'] && $naloga['status_info']['status'] !== 'Za dopolnitev' ? 'disabled' : ''; ?>
+                                >
+                                    <?php echo $naloga['je_prepozno'] && $naloga['status_info']['status'] !== 'Za dopolnitev' ? 'Pretečen rok' : ($naloga['status_info']['status'] === 'Za dopolnitev' ? 'Dopolni' : 'Oddaj'); ?>
+                                </button>
+                            </div>
+                        </li>
+                    <?php endforeach; ?>
+                </ul>
+            <?php endif; ?>
+        </div>
+
+        <div id="oddano-caka-oceno" class="tab-content">
+            <?php if (empty($naloge_oddano)): ?>
+                <p>Nimate nalog, ki bi čakale na oceno.</p>
+            <?php else: ?>
+                <ul class="naloga-list">
+                    <?php foreach ($naloge_oddano as $naloga): ?>
+                        <li class="naloga-item oddano">
+                            <div class="naloga-details">
+                                <h5><?php echo htmlspecialchars($naloga['naslov']); ?></h5>
+                                <p>Predmet: <?php echo htmlspecialchars($naloga['ime_predmeta']); ?> | Oddano: <?php echo date('d.m.Y H:i', strtotime($naloga['datum_oddaje'])); ?></p>
+                            </div>
+                            <div class="naloga-status">
+                                <span class="status-tag" style="background-color: blue;"><?php echo $naloga['status_info']['ikona']; ?> <?php echo htmlspecialchars($naloga['status_info']['status']); ?></span>
+                                <button class="oddaja-btn" 
+                                    data-id-naloga="<?php echo htmlspecialchars($naloga['id_naloga']); ?>"
+                                    data-naslov="<?php echo htmlspecialchars($naloga['naslov']); ?>"
+                                    data-opis="<?php echo htmlspecialchars($naloga['opis_naloge']); ?>"
+                                    data-rok="<?php echo date('d.m.Y H:i', strtotime($naloga['rok_oddaje'])); ?>"
+                                    data-datoteka="<?php echo htmlspecialchars($naloga['naloga_datoteka'] ?? ''); ?>"
+                                    data-status-oddaje="<?php echo htmlspecialchars($naloga['status']); ?>"
+                                    data-ocena="<?php echo htmlspecialchars($naloga['ocena'] ?? ''); ?>"
+                                    data-oddaja-besedilo="<?php echo htmlspecialchars($naloga['besedilo_oddaje'] ?? ''); ?>"
+                                    data-oddaja-datoteka="<?php echo htmlspecialchars($naloga['oddaja_datoteka'] ?? ''); ?>"
+                                    data-komentar-ucitelj="<?php echo htmlspecialchars($naloga['komentar_ucitelj'] ?? ''); ?>"
+                                    disabled
+                                >
+                                    Prikaži
+                                </button>
+                            </div>
+                        </li>
+                    <?php endforeach; ?>
+                </ul>
+            <?php endif; ?>
+        </div>
         
-        <div id="naloga-modal" class="modal">
-            <div class="modal-content">
-                <span class="close-btn">&times;</span>
-                <h4 id="naloga-modal-naslov"></h4>
-                <div id="naloga-modal-vsebina">Nalaganje...</div>
+        <div id="ocenjeno" class="tab-content">
+            <?php if (empty($naloge_ocenjeno)): ?>
+                <p>Nimate ocenjenih nalog.</p>
+            <? else: ?>
+                <ul class="naloga-list">
+                    <?php foreach ($naloge_ocenjeno as $naloga): ?>
+                        <li class="naloga-item ocenjeno">
+                            <div class="naloga-details">
+                                <h5><?php echo htmlspecialchars($naloga['naslov']); ?></h5>
+                                <p>Predmet: <?php echo htmlspecialchars($naloga['ime_predmeta']); ?> | Ocenjeno: <?php echo date('d.m.Y H:i', strtotime($naloga['datum_oddaje'])); ?></p>
+                            </div>
+                            <div class="naloga-status">
+                                <span class="status-tag" style="background-color: <?php echo $naloga['status_info']['barva']; ?>;"><?php echo $naloga['status_info']['ikona']; ?> <?php echo htmlspecialchars($naloga['status_info']['status']); ?></span>
+                                <button class="oddaja-btn" 
+                                    data-id-naloga="<?php echo htmlspecialchars($naloga['id_naloga']); ?>"
+                                    data-naslov="<?php echo htmlspecialchars($naloga['naslov']); ?>"
+                                    data-opis="<?php echo htmlspecialchars($naloga['opis_naloge']); ?>"
+                                    data-rok="<?php echo date('d.m.Y H:i', strtotime($naloga['rok_oddaje'])); ?>"
+                                    data-datoteka="<?php echo htmlspecialchars($naloga['naloga_datoteka'] ?? ''); ?>"
+                                    data-status-oddaje="<?php echo htmlspecialchars($naloga['status']); ?>"
+                                    data-ocena="<?php echo htmlspecialchars($naloga['ocena'] ?? ''); ?>"
+                                    data-oddaja-besedilo="<?php echo htmlspecialchars($naloga['besedilo_oddaje'] ?? ''); ?>"
+                                    data-oddaja-datoteka="<?php echo htmlspecialchars($naloga['oddaja_datoteka'] ?? ''); ?>"
+                                    data-komentar-ucitelj="<?php echo htmlspecialchars($naloga['komentar_ucitelj'] ?? ''); ?>"
+                                >
+                                    Prikaži Oceno
+                                </button>
+                            </div>
+                        </li>
+                    <?php endforeach; ?>
+                </ul>
+            <?php endif; ?>
+        </div>
+
+    </div>
+</div>
+
+<div id="naloga-modal" class="modal">
+    <div class="modal-content">
+        <span class="close-btn">&times;</span>
+        <h3 id="modal-naslov">Naslov naloge</h3>
+        <p id="modal-rok">Rok oddaje: </p>
+        <hr>
+        
+        <h4>Opis naloge:</h4>
+        <p id="modal-opis"></p>
+        <p id="modal-datoteka"></p>
+
+        <div id="oddaja-info-container" style="margin-top: 15px; border: 1px solid #ddd; padding: 10px; background: #f9f9f9; display: none;">
+            <p style="color: green; font-weight: bold;">Status: <span id="oddaja-status"></span></p>
+            <p id="oddaja-datum"></p>
+            <p id="oddaja-besedilo-p">Vaše besedilo: <span id="oddaja-besedilo"></span></p>
+            <p id="oddaja-datoteka-p"></p>
+            <div id="ocena-info" style="margin-top: 10px; border-top: 1px solid #ccc; padding-top: 10px; display: none;">
+                <p style="font-weight: bold;">Ocena: <span id="ocena-vrednost" style="color: green;"></span></p>
+                <p>Komentar učitelja: <span id="komentar-ucitelj"></span></p>
             </div>
         </div>
+
+        <h4 id="form-header" style="margin-top: 20px;">Oddaj nalogo:</h4>
+        <form id="oddaja-form" action="ajax_oddaja.php" method="POST" enctype="multipart/form-data" class="oddaja-form">
+            <input type="hidden" name="id_naloga" id="form-id-naloga" value="">
+            
+            <label for="besedilo_oddaje">Besedilo oddaje (Opcija):</label>
+            <textarea id="besedilo_oddaje_form" name="besedilo_oddaje" rows="6" placeholder="Vnesite svoje besedilo (navadno besedilo ali rešitev)"></textarea>
+            
+            <label for="datoteka">Priloži datoteko (Opcija):</label>
+            <input type="file" id="datoteka_form" name="datoteka">
+            <p style="font-size: 12px; color: #555;">*Če naložite novo datoteko pri ponovni oddaji, bo stara prebrisana.</p>
+
+            <button type="submit">Oddaj nalogo</button>
+        </form>
     </div>
-
-    <div id="oddane" class="tab-content">
-        <h3>Oddane Naloge in Ocene</h3>
-        
-        <div class="filters">
-            <label for="filter-predmet-oddane">Filtriraj po predmetu:</label>
-            <select id="filter-predmet-oddane" onchange="filterNaloge('oddane')">
-                <option value="">Vsi predmeti</option>
-                <?php foreach (array_unique(array_column($predmeti_ucenec, 'ime_predmeta')) as $p): ?>
-                    <option value="<?= htmlspecialchars($p) ?>"><?= htmlspecialchars($p) ?></option>
-                <?php endforeach; ?>
-            </select>
-
-            <label for="filter-ocenjeno-oddane">Status:</label>
-            <select id="filter-ocenjeno-oddane" onchange="filterNaloge('oddane')">
-                <option value="">Vsi statusi</option>
-                <option value="Ocenjeno">Ocenjeno</option>
-                <option value="Oddano">Neocenjeno</option>
-            </select>
-        </div>
-
-        <table id="tabela-oddane">
-            <thead>
-                <tr>
-                    <th>Naslov Naloge</th>
-                    <th>Predmet</th>
-                    <th>Datum Oddaje</th>
-                    <th>Ocena</th>
-                    <th>Komentar Učitelja</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php 
-                // Sortiramo oddane naloge po datumu oddaje
-                usort($oddane_naloge, function($a, $b) {
-                    return strtotime($b['datum_oddaje']) - strtotime($a['datum_oddaje']);
-                });
-                
-                foreach ($oddane_naloge as $oddaja): 
-                    $status_oddaje = empty($oddaja['ocena']) ? 'Oddano' : 'Ocenjeno';
-                ?>
-                    <tr 
-                        data-predmet="<?= htmlspecialchars($oddaja['ime_predmeta']) ?>" 
-                        data-status="<?= $status_oddaje ?>"
-                        data-datum="<?= htmlspecialchars($oddaja['datum_oddaje']) ?>"
-                    >
-                        <td><?= htmlspecialchars($oddaja['naslov']) ?></td>
-                        <td><?= htmlspecialchars($oddaja['ime_predmeta']) ?></td>
-                        <td><?= date('d.m.Y H:i', strtotime($oddaja['datum_oddaje'])) ?></td>
-                        <td style="font-weight: bold; color: <?= $oddaja['ocena'] == 'ND' ? 'red' : (empty($oddaja['ocena']) ? 'gray' : 'green') ?>;"><?= htmlspecialchars($oddaja['ocena'] ?? 'Čaka') ?></td>
-                        <td><?= htmlspecialchars($oddaja['komentar_ucitelj'] ?? '-') ?></td>
-                    </tr>
-                <?php endforeach; ?>
-            </tbody>
-        </table>
-    </div>
-
 </div>
 
 <script>
-    // Nastavitev zavihkov
-    function openTab(evt, tabName) {
-        var i, tabcontent, tablinks;
-        tabcontent = document.getElementsByClassName("tab-content");
-        for (i = 0; i < tabcontent.length; i++) {
-            tabcontent[i].style.display = "none";
-        }
-        tablinks = document.getElementsByClassName("tab-button");
-        for (i = 0; i < tablinks.length; i++) {
-            tablinks[i].className = tablinks[i].className.replace(" active", "");
-        }
-        document.getElementById(tabName).style.display = "block";
-        evt.currentTarget.className += " active";
-        
-        // Ob menjavi zavihka ponovno uveljavi filtre za aktivni zavihek
-        filterNaloge(tabName);
-    }
-    
-    // Funkcija za filtriranje tabel
-    function filterNaloge(tabId) {
-        const tabela = document.getElementById(`tabela-${tabId}`);
-        if (!tabela) return;
-
-        const filterPredmet = document.getElementById(`filter-predmet-${tabId}`).value;
-        const filterStatus = document.getElementById(`filter-ocenjeno-${tabId}`)?.value;
-        // Za filtriranje po datumu bi potrebovali še vnosno polje
-
-        const rows = tabela.getElementsByTagName('tbody')[0].getElementsByTagName('tr');
-
-        for (let i = 0; i < rows.length; i++) {
-            const row = rows[i];
-            const predmet = row.getAttribute('data-predmet');
-            const status = row.getAttribute('data-status');
-            
-            let showRow = true;
-
-            if (filterPredmet && predmet !== filterPredmet) {
-                showRow = false;
-            }
-
-            if (tabId === 'oddane' && filterStatus) {
-                if (status !== filterStatus) {
-                    showRow = false;
-                }
-            }
-
-            row.style.display = showRow ? '' : 'none';
-        }
-    }
-
-
-    // Nastavitev Modala (za Oddajo/Pregled naloge)
     const modal = document.getElementById('naloga-modal');
-    const closeBtn = document.getElementsByClassName("close-btn")[0];
-
+    const closeBtn = document.querySelector('.close-btn');
+    const oddajaForm = document.getElementById('oddaja-form');
+    
+    // Zapiranje modala
     closeBtn.onclick = function() {
         modal.style.display = "none";
+        // Počistimo vsebino pri zapiranju
+        oddajaForm.reset();
     }
-
     window.onclick = function(event) {
         if (event.target == modal) {
             modal.style.display = "none";
+            oddajaForm.reset();
         }
     }
-    
-    // Asinhrono nalaganje detajlov naloge (re-using existing AJAX logic)
-    async function prikaziNalogo(id_naloga, ime_predmeta, ime_ucitelja) {
-        const nalogaVsebina = document.getElementById('naloga-modal-vsebina');
-        document.getElementById('naloga-modal-naslov').textContent = `Naloga: ${ime_predmeta} - ${ime_ucitelja}`;
-        nalogaVsebina.innerHTML = 'Nalaganje...';
-        modal.style.display = "block";
 
-        try {
-            // Predpostavljamo, da imamo datoteko ajax_naloga_pregled.php, ki nalaga naloga_ucenec.php
-            const response = await fetch('ajax_naloga.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    id_naloga: id_naloga, // Pošljemo specifičen ID naloge
-                    id_predmet: null, // Ni potrebno, če pošljemo ID naloge
-                    id_ucitelja: null, // Ni potrebno
-                    vloga: 'ucenec' 
-                })
-            });
+    // Funkcija za preklapljanje zavihkov
+    function openTab(evt) {
+        const tabName = evt.currentTarget.dataset.tab;
+        
+        // Odstrani 'active' razred z vseh gumbov in vsebin
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
+
+        // Dodaj 'active' razred izbranemu gumbu in vsebini
+        document.getElementById(tabName).classList.add('active');
+        evt.currentTarget.classList.add('active');
+    }
+
+    document.querySelectorAll('.tab-button').forEach(button => {
+        button.addEventListener('click', openTab);
+    });
+
+    // Funkcija za odpiranje modala in polnjenje podatkov
+    document.querySelectorAll('.oddaja-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const idNaloga = this.dataset.idNaloga;
+            const naslov = this.dataset.naslov;
+            const rok = this.dataset.rok;
+            const opis = this.dataset.opis;
+            const nalogaDatoteka = this.dataset.datoteka;
+            const statusOddaje = this.dataset.statusOddaje; // NULL, Oddano, Ocenjeno
+            const ocena = this.dataset.ocena;
+            const oddajaBesedilo = this.dataset.oddajaBesedilo;
+            const oddajaDatoteka = this.dataset.oddajaDatoteka;
+            const komentarUcitelj = this.dataset.komentarUcitelj;
             
-            const html = await response.text();
-            nalogaVsebina.innerHTML = html;
-            
-            // Če je naloga naložena, poišči oddaja-form in dodaj poslušalca
-            const oddajaForm = document.getElementById('oddaja-form');
-            if (oddajaForm) {
-                oddajaForm.addEventListener('submit', handleOddajaSubmit);
+            // Ponastavi formo in prikaže podatke
+            oddajaForm.reset();
+            document.getElementById('form-id-naloga').value = idNaloga;
+            document.getElementById('modal-naslov').textContent = naslov;
+            document.getElementById('modal-rok').textContent = 'Rok oddaje: ' + rok;
+            document.getElementById('modal-opis').innerHTML = opis.replace(/\n/g, '<br>');
+
+            // Prikaže/skrije datoteko naloge
+            const nalogaDatotekaP = document.getElementById('modal-datoteka');
+            if (nalogaDatoteka) {
+                nalogaDatotekaP.innerHTML = `Priložena datoteka učitelja: <a href="${nalogaDatoteka}" target="_blank">Prenesi datoteko</a>`;
+                nalogaDatotekaP.style.display = 'block';
+            } else {
+                nalogaDatotekaP.style.display = 'none';
             }
             
-        } catch (error) {
-            nalogaVsebina.innerHTML = '<p style="color: red;">Napaka pri nalaganju detajlov naloge.</p>';
-            console.error('Fetch error:', error);
-        }
-    }
-    
-    // Funkcija za obravnavo oddaje (re-using ajax_oddaja.php logic)
-    async function handleOddajaSubmit(e) {
+            // Posodobi/skrije informacije o oddaji
+            const oddajaInfoContainer = document.getElementById('oddaja-info-container');
+            const ocenaInfo = document.getElementById('ocena-info');
+            const formHeader = document.getElementById('form-header');
+
+            if (statusOddaje && statusOddaje !== 'NULL') {
+                // Je že oddano
+                oddajaInfoContainer.style.display = 'block';
+                document.getElementById('oddaja-status').textContent = statusOddaje;
+                document.getElementById('oddaja-besedilo').textContent = oddajaBesedilo;
+
+                const oddajaDatotekaP = document.getElementById('oddaja-datoteka-p');
+                if (oddajaDatoteka) {
+                    oddajaDatotekaP.innerHTML = `Vaša oddana datoteka: <a href="${oddajaDatoteka}" target="_blank">Prenesi</a>`;
+                    oddajaDatotekaP.style.display = 'block';
+                } else {
+                    oddajaDatotekaP.style.display = 'none';
+                }
+
+                document.getElementById('besedilo_oddaje_form').value = oddajaBesedilo; // Predpolni besedilo
+
+                // Prikaz ocene in komentarja
+                if (statusOddaje === 'Ocenjeno') {
+                    ocenaInfo.style.display = 'block';
+                    document.getElementById('ocena-vrednost').textContent = ocena;
+                    document.getElementById('komentar-ucitelj').textContent = komentarUcitelj;
+                } else {
+                    ocenaInfo.style.display = 'none';
+                }
+
+                // Upravljanje forme za ponovno oddajo/prikaz
+                const submitBtn = oddajaForm.querySelector('button[type="submit"]');
+                if (statusOddaje === 'Oddano' && ocena === 'NULL') {
+                    // Čaka na oceno - onemogoči oddajo in spremeni naslov
+                    submitBtn.disabled = true;
+                    submitBtn.textContent = 'Oddano (Čaka na oceno)';
+                    formHeader.textContent = 'Oddana rešitev:';
+                } else if (ocena === 'ND') {
+                    // Za dopolnitev - omogoči oddajo in spremeni naslov
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Dopolni nalogo';
+                    formHeader.textContent = 'Dopolni nalogo:';
+                } else if (statusOddaje === 'Ocenjeno' && ocena !== 'ND') {
+                    // Ocenjeno - onemogoči oddajo in spremeni naslov
+                    submitBtn.disabled = true;
+                    submitBtn.textContent = 'Ocenjeno';
+                    formHeader.textContent = 'Ocenjena rešitev:';
+                } else {
+                    // Morda kakšno vmesno stanje, privzeto onemogoči
+                    submitBtn.disabled = true;
+                    submitBtn.textContent = 'Že oddano';
+                    formHeader.textContent = 'Oddana rešitev:';
+                }
+
+            } else {
+                // Še ni oddano
+                oddajaInfoContainer.style.display = 'none';
+                ocenaInfo.style.display = 'none';
+                
+                const rokDate = new Date(this.dataset.rok);
+                const now = new Date();
+                const isLate = now > rokDate;
+                
+                const submitBtn = oddajaForm.querySelector('button[type="submit"]');
+                if (isLate) {
+                    // Pretečen rok
+                    submitBtn.disabled = true;
+                    submitBtn.textContent = 'Pretečen rok';
+                    formHeader.textContent = 'Oddaja ni več mogoča.';
+                } else {
+                    // Nova oddaja
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Oddaj nalogo';
+                    formHeader.textContent = 'Oddaj nalogo:';
+                }
+            }
+
+            modal.style.display = "block";
+        });
+    });
+
+    // AJAX oddaja (using ajax_oddaja.php logic)
+    oddajaForm.addEventListener('submit', async function(e) {
         e.preventDefault();
         
         const form = e.currentTarget;
@@ -417,9 +746,9 @@ try {
             alert(result.message);
             
             if (result.success) {
-                // Če je uspešno, ponovno naloži stran ali modal za osvežitev statusa
+                // Če je uspešno, ponovno naloži stran za osvežitev statusa
                 modal.style.display = "none";
-                window.location.reload(); // Najenostavnejša rešitev za osvežitev seznama
+                window.location.reload(); 
             } else {
                 submitBtn.disabled = false;
                 submitBtn.textContent = 'Poskusi ponovno oddati';
@@ -429,11 +758,11 @@ try {
             submitBtn.disabled = false;
             submitBtn.textContent = 'Oddaj nalogo';
         }
-    }
+    });
 
-    // Inicialni prikaz zavihka in filtrov
+    // Inicialni prikaz zavihka (Nova naloga)
     document.addEventListener('DOMContentLoaded', () => {
-        openTab({ currentTarget: document.querySelector('.tab-button.active') }, 'aktivne');
+        // Pusti, da se prikaže privzeti aktivni zavihek iz HTML
     });
 
 </script>
