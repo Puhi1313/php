@@ -107,6 +107,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=BBH+Sans+Hegarty&family=Climate+Crisis:YEAR@2009&display=swap" rel="stylesheet">
   <meta charset="UTF-8" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Momo+Trust+Display&family=Raleway:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta charset="UTF-8">
     <title>Prijava v Redovalnico</title>
@@ -117,7 +121,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     body {
       background-color: #cdcdb6;
       margin: 0;
-      font-family: "BBH Sans Hegarty", sans-serif;
+      font-family: "Raleway", sans-serif;
     }
     header {
       background: #cdcdb6;
@@ -154,6 +158,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         box-sizing: border-box;
     }
     .hero .welcome {
+      font-family: "BBH Sans Hegarty", sans-serif;
       font-size: 42px;
       font-weight: bold;
       max-width: 400px;
