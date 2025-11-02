@@ -177,6 +177,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     .form-right {
       flex: 1;
       background-image: url("slike/corporate_memphis1.png");
+      background-size: cover; 
       display: flex;
       align-items: center;
       justify-content: center;
