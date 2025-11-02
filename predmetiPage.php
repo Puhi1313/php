@@ -262,7 +262,7 @@ try {
             
             if (data.success) {
                 feedbackElement.textContent = "Uspešno shranjeno! Nadaljevanje v Učilnico...";
-                window.location.href = 'ucilnicaPage.php'; 
+                window.location.href = 'ucenec_ucilnica.php'; 
             } else {
                 feedbackElement.textContent = "Napaka pri shranjevanju: " + data.message;
             }

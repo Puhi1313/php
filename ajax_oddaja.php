@@ -21,7 +21,7 @@ if (empty($id_naloga)) {
 
 $pot_na_strezniku = null;
 $ze_oddano = false; 
-$allow_re_submission = false; // Dovoljenje za dopolnitev po nezadostni oceni
+$oddaja_data = null; 
 
 try {
     // 1. Pridobimo podatke o nalogi
@@ -35,12 +35,7 @@ try {
         exit;
     }
 
-    $rok_oddaje_original = new DateTime($naloga_data['rok_oddaje']);
-    $rok_oddaje_dejanski = clone $rok_oddaje_original;
-    $danes = new DateTime();
-
-
-    // 2. Preverimo obstoj prejšnje oddaje in ocene
+    // 2. Preverimo obstoj prejšnje oddaje in rok oddaje
     $sql_oddaja = "SELECT * FROM oddaja WHERE id_naloga = ? AND id_ucenec = ? ORDER BY id_oddaja DESC LIMIT 1";
     $stmt_oddaja = $pdo->prepare($sql_oddaja);
     $stmt_oddaja->execute([$id_naloga, $user_id]);
@@ -48,85 +43,49 @@ try {
     
     if ($oddaja_data) {
         $ze_oddano = true;
-        $ocena_up = strtoupper(trim($oddaja_data['ocena'] ?? ''));
-
-        // Preverjanje za dopolnitev: Dovoljena, če je ocena '1' ali 'ND'
-        if ($ocena_up === '1' || $ocena_up === 'ND') {
-            $allow_re_submission = true;
-            
-            // Logika za PODALJŠANJE ROKA: Če je rok potekel, je podaljšan za 7 dni
-            if ($danes > $rok_oddaje_original) {
-                 $datum_ocenjevanja = new DateTime($oddaja_data['datum_oddaje']); // Za demo uporabimo datum oddaje
-                 $nov_rok = clone $datum_ocenjevanja;
-                 $nov_rok->modify('+7 days');
-                 
-                 // Dejanski rok je lahko podaljšan (če je večji od prvotnega)
-                 if ($nov_rok > $rok_oddaje_dejanski) {
-                     $rok_oddaje_dejanski = $nov_rok;
-                 }
-            }
-        } 
-        // Preverjanje za Zaklep: Zaklenemo, če je oddano, ocenjeno in ocena NI '1' ali 'ND'
-        elseif ($oddaja_data['ocena'] !== null) {
-            echo json_encode(["success" => false, "message" => "Naloga je že ocenjena z zadostno oceno. Posodobitev ni dovoljena."]);
-            exit;
-        }
     }
 
-    // Ponovno preverimo, ali je prepozno glede na DEJANJKI/PODALJŠANI rok
-    $je_prepozno_dejansko = $danes > $rok_oddaje_dejanski;
+    $rok_oddaje_original = new DateTime($naloga_data['rok_oddaje']);
+    $danes = new DateTime();
+    $je_prepozno = $danes > $rok_oddaje_original;
     
-    // 3. Glavna preprečitev oddaje: 
-    if (!$ze_oddano && $je_prepozno_dejansko) {
-        // Prva oddaja po prvotnem roku ni dovoljena
-        echo json_encode(["success" => false, "message" => "Rok za prvo oddajo je potekel."]);
-        exit;
-    } 
+    // Če je ocenjeno ND, dopustimo dopolnitev tudi po roku, sicer ne
+    $allow_re_submission = $oddaja_data && strtoupper($oddaja_data['ocena']) === 'ND';
     
-    if ($ze_oddano && $je_prepozno_dejansko && !$allow_re_submission) {
-        // Posodobitev po podaljšanem roku, ki ni bila dopolnitev (ne bi se smelo zgoditi, če je bil disabled form)
-        echo json_encode(["success" => false, "message" => "Rok za oddajo je potekel, in naloga ni za dopolnitev."]);
-        exit;
-    }
-    
-    // Če je dopolnitev in je po podaljšanem roku
-    if ($allow_re_submission && $je_prepozno_dejansko) {
-        echo json_encode(["success" => false, "message" => "Rok za dopolnitev je potekel (" . $rok_oddaje_dejanski->format('d.m.Y H:i') . "). Oddaja ni več mogoča."]);
+    if ($je_prepozno && !$allow_re_submission) {
+        echo json_encode(["success" => false, "message" => "Rok za oddajo je potekel in nimate dovoljenja za dopolnitev (vaša ocena ni ND)."]);
         exit;
     }
 
-
-    // 4. Obdelava datoteke (enak kot prej)
+    // 3. Obdelava datoteke
     if (isset($_FILES['datoteka']) && $_FILES['datoteka']['error'] === UPLOAD_ERR_OK) {
-        $upload_dir = 'uploads/oddaje/'; 
-        
+        $upload_dir = 'uploads/oddaje/'; // Predpostavljamo, da ta mapa obstaja!
         if (!is_dir($upload_dir)) {
             mkdir($upload_dir, 0777, true);
         }
         
-        $file_extension = pathinfo($_FILES['datoteka']['name'], PATHINFO_EXTENSION);
-        $file_name_clean = preg_replace('/[^A-Za-z0-9_\-]/', '_', pathinfo($_FILES['datoteka']['name'], PATHINFO_FILENAME));
-        $new_file_name = $file_name_clean . '_' . $user_id . '_' . time() . '.' . $file_extension;
-        $target_file = $upload_dir . $new_file_name;
-        
+        $file_name = uniqid('oddaja_') . '_' . basename($_FILES['datoteka']['name']);
+        $target_file = $upload_dir . $file_name;
+
         if (move_uploaded_file($_FILES['datoteka']['tmp_name'], $target_file)) {
             $pot_na_strezniku = $target_file;
             
-            // Če je posodobitev, izbrišemo staro datoteko, če obstaja in ni enaka novi
-            if ($ze_oddano && $oddaja_data['pot_na_strezniku'] && file_exists($oddaja_data['pot_na_strezniku']) && $oddaja_data['pot_na_strezniku'] !== $pot_na_strezniku) {
-                @unlink($oddaja_data['pot_na_strezniku']);
+            // Če je datoteka naložena, staro datoteko izbrišemo (samo, če obstaja)
+            if ($ze_oddano && $oddaja_data['pot_na_strezniku'] && file_exists($oddaja_data['pot_na_strezniku'])) {
+                 @unlink($oddaja_data['pot_na_strezniku']);
             }
         } else {
-             echo json_encode(['success' => false, 'message' => 'Napaka pri premiku datoteke na strežnik.']);
-             exit;
+            echo json_encode(["success" => false, "message" => "Napaka pri nalaganju datoteke na strežnik."]);
+            exit;
         }
     } else {
-        // Če ni priložena nova datoteka, obdržimo staro pot (če je to posodobitev)
-        if ($ze_oddano && $oddaja_data['pot_na_strezniku']) {
+        // Če ni naložene nove datoteke, ohranimo staro pot (za posodobitev)
+        if ($ze_oddano) {
             $pot_na_strezniku = $oddaja_data['pot_na_strezniku'];
         }
     }
-
+    
+    // 4. Preverjanje vsebine
     if (empty($besedilo_oddaje) && empty($pot_na_strezniku)) {
         echo json_encode(["success" => false, "message" => "Za oddajo vnesite besedilo ali naložite datoteko."]);
         exit;
@@ -151,11 +110,13 @@ try {
     }
 
     echo json_encode(["success" => true, "message" => $sporocilo]);
-
+    
 } catch (\PDOException $e) {
-    error_log("Napaka oddaje: " . $e->getMessage());
-    echo json_encode(["success" => false, "message" => "Splošna napaka baze podatkov pri oddaji. " . $e->getMessage()]);
+    // V primeru neuspeha poskrbimo za tiho brisanje naložene datoteke
+    if ($pot_na_strezniku && file_exists($pot_na_strezniku)) {
+        @unlink($pot_na_strezniku);
+    }
+    echo json_encode(["success" => false, "message" => "Napaka baze: " . $e->getMessage()]);
 } catch (\Exception $e) {
-    error_log("Splošna napaka oddaje: " . $e->getMessage());
-    echo json_encode(["success" => false, "message" => "Splošna napaka pri obdelavi oddaje."]);
+    echo json_encode(["success" => false, "message" => "Splošna napaka: " . $e->getMessage()]);
 }
