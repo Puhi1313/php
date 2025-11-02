@@ -107,6 +107,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=BBH+Sans+Hegarty&family=Climate+Crisis:YEAR@2009&display=swap" rel="stylesheet">
   <meta charset="UTF-8" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Momo+Trust+Display&family=Raleway:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta charset="UTF-8">
     <title>Prijava v Redovalnico</title>
@@ -117,7 +121,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     body {
       background-color: #cdcdb6;
       margin: 0;
-      font-family: "BBH Sans Hegarty", sans-serif;
+      font-family: "Raleway", sans-serif;
     }
     header {
       background: #cdcdb6;
@@ -154,6 +158,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         box-sizing: border-box;
     }
     .hero .welcome {
+      font-family: "BBH Sans Hegarty", sans-serif;
       font-size: 42px;
       font-weight: bold;
       max-width: 400px;
@@ -200,13 +205,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       background: #333;
     }
     .features {
-      display: flex;
       background-color: #cdcdb6;
+      padding: 20px 10%;
+      text-align: center;
+    }
+
+    .features-title {
+      font-family: "Raleway", sans-serif;
+      font-size: 36px;
+      color: #596235;
+      margin-bottom: 40px;
+    }
+
+    .features-row {
+      display: flex;
       justify-content: space-around;
       align-items: flex-start;
-      padding: 60px 10%;
       gap: 20px;
     }
+
     .feature {
       flex: 1;
       text-align: center;
@@ -292,21 +309,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </section>
 
     <section class="features">
-    <div class="feature">
-      <div class="circle">
-        <span class="hover-text">Svetovno znani učitelji</span>
+      <h1 class="features-title">Naše Prednosti</h1>
+      <div class="features-row">
+        <div class="feature">
+          <div class="circle">
+            <span class="hover-text">Svetovno znani učitelji</span>
+          </div>
+        </div>
+        <div class="feature">
+          <div class="circle">
+            <span class="hover-text">Veliko možnosti izobrazbe</span>
+          </div>
+        </div>
+        <div class="feature">
+          <div class="circle">
+            <span class="hover-text">Visoka kvantiteta uspešnosti učencev</span>
+          </div>
+        </div>
       </div>
-    </div>
-    <div class="feature">
-      <div class="circle">
-        <span class="hover-text">Veliko možnosti izobrazbe</span>
-      </div>
-    </div>
-    <div class="feature">
-      <div class="circle">
-        <span class="hover-text">Visoka kvantiteta uspešnosti učencev</span>
-      </div>
-    </div>
-  </section>
+    </section>
 </body>
 </html>
