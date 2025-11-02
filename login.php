@@ -205,13 +205,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       background: #333;
     }
     .features {
-      display: flex;
       background-color: #cdcdb6;
+      padding: 20px 10%;
+      text-align: center;
+    }
+
+    .features-title {
+      font-family: "Raleway", sans-serif;
+      font-size: 36px;
+      color: #596235;
+      margin-bottom: 40px;
+    }
+
+    .features-row {
+      display: flex;
       justify-content: space-around;
       align-items: flex-start;
-      padding: 60px 10%;
       gap: 20px;
     }
+
     .feature {
       flex: 1;
       text-align: center;
@@ -297,21 +309,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </section>
 
     <section class="features">
-    <div class="feature">
-      <div class="circle">
-        <span class="hover-text">Svetovno znani učitelji</span>
+      <h1 class="features-title">Naše Prednosti</h1>
+      <div class="features-row">
+        <div class="feature">
+          <div class="circle">
+            <span class="hover-text">Svetovno znani učitelji</span>
+          </div>
+        </div>
+        <div class="feature">
+          <div class="circle">
+            <span class="hover-text">Veliko možnosti izobrazbe</span>
+          </div>
+        </div>
+        <div class="feature">
+          <div class="circle">
+            <span class="hover-text">Visoka kvantiteta uspešnosti učencev</span>
+          </div>
+        </div>
       </div>
-    </div>
-    <div class="feature">
-      <div class="circle">
-        <span class="hover-text">Veliko možnosti izobrazbe</span>
-      </div>
-    </div>
-    <div class="feature">
-      <div class="circle">
-        <span class="hover-text">Visoka kvantiteta uspešnosti učencev</span>
-      </div>
-    </div>
-  </section>
+    </section>
 </body>
 </html>
