@@ -91,62 +91,334 @@ try {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Učilnica za Učitelje</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Momo+Trust+Display&family=Raleway:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
     <style>
-        /* Osnovni Stil */
-        body { margin: 0; font-family: Arial, sans-serif; background: #f9f9f9; }
-        header { background: #1c4587; color: white; display: flex; justify-content: space-between; align-items: center; padding: 15px 30px; }
-        header .logo { font-weight: bold; font-size: 18px; }
-        .container { max-width: 1200px; margin: 20px auto; padding: 0 15px; }
+        html {
+            color: #596235;
+        }
+        body {
+            margin: 0;
+            font-family: "Raleway", sans-serif;
+            /* Harmonious layered background using existing palette */
+            background:
+                radial-gradient(900px 500px at 10% -10%, rgba(205, 205, 182, 0.65), rgba(205, 205, 182, 0) 70%),
+                radial-gradient(900px 500px at 110% 10%, rgba(128, 133, 47, 0.18), rgba(128, 133, 47, 0) 60%),
+                linear-gradient(180deg, #f7f8f3 0%, #eff1e4 45%, #e3e6d1 100%);
+            background-attachment: fixed;
+            color: #596235;
+        }
+        header {
+            background: #cdcdb6;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 20px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        header .logo {
+            font-weight: bold;
+            font-size: 24px;
+            color: #596235;
+        }
+        header nav {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        header nav span {
+            color: #596235;
+        }
+        header nav a {
+            color: #596235;
+            text-decoration: none;
+            transition: text-decoration 0.2s;
+        }
+        header nav a:hover {
+            text-decoration: underline;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 0 15px;
+        }
+        
+        h2 {
+            color: #596235;
+            border-bottom: 2px solid #cdcdb6;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
         
         /* Stil za Zavihke (Tabs) */
-        .tabs { display: flex; margin-bottom: 20px; border-bottom: 2px solid #ddd; }
-        .tab-button { 
-            padding: 10px 20px; 
-            cursor: pointer; 
-            border: none; 
-            background: none; 
-            font-size: 16px; 
-            color: #555; 
-            transition: all 0.3s;
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #ddd;
         }
-        .tab-button.active { 
-            color: #1c4587; 
-            border-bottom: 3px solid #1c4587; 
-            font-weight: bold; 
-            background: #eef5ff;
+        .tab-button {
+            background: #eee;
+            border: 1px solid #ddd;
+            border-bottom: none;
+            padding: 10px 15px;
+            cursor: pointer;
+            margin-right: 5px;
+            border-radius: 10px 10px 0 0;
+            font-size: 16px;
+            color: #596235;
+            transition: background 0.3s, transform 0.15s ease, color 0.3s;
         }
-        .tab-content { display: none; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        .tab-content.active { display: block; }
+        .tab-button:hover {
+            transform: translateY(-1px);
+            background: #f5f5f5;
+        }
+        .tab-button.active {
+            background: #fff;
+            border-color: #cdcdb6;
+            border-bottom: 2px solid #fff;
+            font-weight: bold;
+            color: #596235;
+        }
+        .tab-content {
+            display: none;
+            background: white;
+            padding: 20px;
+            border: 1px solid #cdcdb6;
+            border-top: none;
+            border-radius: 0 10px 10px 10px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+        }
+        .tab-content.active {
+            display: block;
+        }
         
         /* Stil za Levo/Desno postavitev */
-        .split-content { display: flex; gap: 20px; }
-        .left-panel { flex: 1; max-width: 300px; background: #f4f4f4; padding: 15px; border-radius: 6px; }
-        .right-panel { flex: 3; background: white; padding: 20px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .split-content {
+            display: flex;
+            gap: 20px;
+        }
+        .left-panel {
+            flex: 1;
+            max-width: 300px;
+            background: #f8f8f0;
+            padding: 20px;
+            border-radius: 10px;
+            border: 1px solid #cdcdb6;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+        .left-panel h4 {
+            margin-top: 0;
+            color: #596235;
+            border-bottom: 2px solid #cdcdb6;
+            padding-bottom: 5px;
+            margin-bottom: 15px;
+        }
+        .right-panel {
+            flex: 3;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+            border: 1px solid #cdcdb6;
+        }
+        .right-panel h3 {
+            color: #596235;
+            margin-top: 0;
+            border-bottom: 2px solid #cdcdb6;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+        .right-panel p {
+            color: #596235;
+            line-height: 1.6;
+        }
         
         /* Seznam predmetov/učencev */
-        .list-group-header { font-weight: bold; padding: 10px 0; border-bottom: 1px solid #ddd; margin-top: 15px; }
-        .list-item { padding: 8px 0; cursor: pointer; border-bottom: 1px dotted #eee; }
-        .list-item:hover, .list-item.active { background: #e0eaff; font-weight: bold; }
-        .naloga-item { padding: 10px; border: 1px solid #ddd; margin-bottom: 10px; border-radius: 4px; cursor: pointer;}
-        .naloga-item.active { background: #e0eaff; border-color: #1c4587; font-weight: bold; }
+        .list-group-header {
+            font-weight: bold;
+            padding: 10px 0;
+            border-bottom: 2px solid #cdcdb6;
+            margin-top: 15px;
+            color: #596235;
+        }
+        .list-item {
+            padding: 10px;
+            margin-bottom: 5px;
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            cursor: pointer;
+            color: #596235;
+            transition: background 0.2s, border-color 0.2s, transform 0.15s ease, box-shadow 0.15s ease;
+        }
+        .list-item:hover, .list-item.active {
+            background: #e6e6fa;
+            border-color: #cdcdb6;
+            font-weight: bold;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+        }
         
-        .day-header { font-size: 1.1em; font-weight: bold; margin-top: 15px; padding-bottom: 5px; border-bottom: 2px solid #1c4587; }
+        .naloga-item {
+            padding: 12px 15px;
+            border: 1px solid #e2e2e2;
+            border-left: 5px solid #cdcdb6;
+            margin-bottom: 10px;
+            border-radius: 10px;
+            cursor: pointer;
+            background: #fff;
+            transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.2s ease, background 0.2s;
+            color: #596235;
+        }
+        .naloga-item:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(0,0,0,0.07);
+            border-left-color: #80852f;
+        }
+        .naloga-item.active {
+            background: #e6e6fa;
+            border-color: #cdcdb6;
+            border-left-color: #596235;
+            font-weight: bold;
+        }
+        
+        .day-header {
+            font-size: 1.1em;
+            font-weight: bold;
+            margin-top: 15px;
+            padding-bottom: 5px;
+            border-bottom: 2px solid #cdcdb6;
+            color: #596235;
+        }
+        
+        /* Form styling */
+        form label {
+            display: block;
+            margin-bottom: 5px;
+            color: #596235;
+            font-weight: 500;
+        }
+        form input[type="text"],
+        form input[type="datetime-local"],
+        form textarea,
+        form select {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-family: "Raleway", sans-serif;
+            color: #596235;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        form input[type="text"]:focus,
+        form input[type="datetime-local"]:focus,
+        form textarea:focus,
+        form select:focus {
+            outline: none;
+            border-color: #cdcdb6;
+            box-shadow: 0 0 0 3px rgba(205, 205, 182, 0.2);
+        }
+        form button[type="submit"] {
+            padding: 10px 20px;
+            background: #596235;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 500;
+            transition: background 0.3s, transform 0.15s ease;
+        }
+        form button[type="submit"]:hover:not(:disabled) {
+            background: #4a5230;
+            transform: translateY(-1px);
+        }
+        form button[type="submit"]:disabled {
+            background: #999;
+            cursor: not-allowed;
+        }
+        form input[type="file"] {
+            padding: 5px;
+            margin-bottom: 15px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-family: "Raleway", sans-serif;
+        }
+        
+        /* Button styling for grading and other action buttons */
+        button.pregled-oddaje-btn,
+        button.delete-btn,
+        .btn-primary {
+            padding: 8px 15px;
+            background: #596235;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            transition: background 0.3s, transform 0.15s ease;
+            font-family: "Raleway", sans-serif;
+        }
+        button.pregled-oddaje-btn:hover:not(:disabled),
+        button.delete-btn:hover:not(:disabled),
+        .btn-primary:hover:not(:disabled) {
+            background: #4a5230;
+            transform: translateY(-1px);
+        }
+        button.delete-btn {
+            background: #a85d4a;
+        }
+        button.delete-btn:hover:not(:disabled) {
+            background: #8d4e3d;
+        }
         
         .modal {
-            display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.4);
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.4);
+            padding-top: 60px;
         }
         .modal-content {
-            background-color: #fefefe; margin: 5% auto; padding: 20px; border: 1px solid #888; width: 90%; max-width: 800px; border-radius: 8px;
+            background-color: #fefefe;
+            margin: 5% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 90%;
+            max-width: 800px;
+            border-radius: 16px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
         }
-        .close-btn { color: #aaa; float: right; font-size: 28px; font-weight: bold; }
-        .close-btn:hover, .close-btn:focus { color: black; text-decoration: none; cursor: pointer; }
+        .close-btn {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            transition: color 0.2s;
+        }
+        .close-btn:hover, .close-btn:focus {
+            color: #596235;
+            text-decoration: none;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
 
 <header>
-    <div class="logo">UČILNICA</div>
-    <div>Prijavljen: **<?= htmlspecialchars($ime_priimek) ?>** (<?= $vloga === 'admin' ? 'Administrator' : 'Učitelj' ?>) | <a href="logout.php" style="color: #ffdddd;">Odjava</a></div>
+    <div class="logo">E-Učilnica</div>
+    <nav>
+        <span>Pozdravljen, <?= htmlspecialchars($ime_priimek) ?> (<?= $vloga === 'admin' ? 'Administrator' : 'Učitelj' ?>)</span>
+        <a href="logout.php">Odjava</a>
+    </nav>
 </header>
 
 <div class="container">
