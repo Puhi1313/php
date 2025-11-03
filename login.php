@@ -71,14 +71,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             header('Location: adminPage.php');
                             exit();
                         } elseif ($uporabnik['vloga'] === 'ucitelj') {
-                            header('Location: ucilnicaPage.php');
+                            header('Location: ucitelj_ucilnica.php');
                             exit();
                         } elseif ($uporabnik['vloga'] === 'ucenec') {
                             if ($uporabnik['prvi_vpis'] == 1) {
                                 header('Location: predmetiPage.php');
                                 exit();
                             } else {
-                                header('Location: ucilnicaPage.php');
+                                header('Location: ucenec_ucilnica.php');
                                 exit();
                             }
                         }

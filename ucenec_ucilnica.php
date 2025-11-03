@@ -25,20 +25,28 @@ try {
 
     // 2. Pridobitev vseh predmetov, ki jih ima učenec
     $sql_predmeti = "
-        SELECT DISTINCT p.id_predmet, p.ime_predmeta, 
-            u.id_uporabnik AS id_ucitelja, u.ime AS ime_ucitelja, u.priimek AS priimek_ucitelja
-        FROM ucenec_predmet ucp  -- Začnemo s to tabelo za boljši fokus
-        INNER JOIN predmet p ON ucp.id_predmet = p.id_predmet
-        INNER JOIN ucitelj_predmet upr ON p.id_predmet = upr.id_predmet -- POPRAVLJENO IME TABELE IN ALIAS (upr)
-        INNER JOIN uporabnik u ON upr.id_ucitelj = u.id_uporabnik 
-        WHERE ucp.id_ucenec = ?  -- SAMO EN VPRASAJ (Placeholder)
+        SELECT 
+            p.id_predmet, 
+            p.ime_predmeta, 
+            GROUP_CONCAT(DISTINCT CONCAT(u.ime, ' ', u.priimek) SEPARATOR ', ') AS ucitelji
+        FROM ucenec_predmet ucp
+        JOIN predmet p ON ucp.id_predmet = p.id_predmet
+        JOIN ucitelj_predmet upr ON p.id_predmet = upr.id_predmet
+        JOIN uporabnik u ON upr.id_ucitelj = u.id_uporabnik
+        WHERE ucp.id_ucenec = ?
+        GROUP BY p.id_predmet
         ORDER BY p.ime_predmeta ASC
     ";
     $stmt_predmeti = $pdo->prepare($sql_predmeti);
     $stmt_predmeti->execute([$user_id]);
     $predmeti_ucenec = $stmt_predmeti->fetchAll();
 
-    // 3. Pridobitev vseh nalog za te predmete
+    // --- FILTER: preberi GET parametre (predmet in datum)
+    $filter_predmet = isset($_GET['predmet']) ? (int)$_GET['predmet'] : 0;
+    $filter_from = $_GET['from'] ?? '';
+    $filter_to = $_GET['to'] ?? '';
+
+    // 3. Pridobitev vseh nalog za te predmete (z možnostjo filtriranja)
     // Vključuje tudi status oddaje (ali NULL, če ni oddano) in podatke o oceni.
     $sql_naloge = "
         SELECT 
@@ -49,24 +57,42 @@ try {
         FROM naloga n
         JOIN predmet p ON n.id_predmet = p.id_predmet
         JOIN uporabnik u ON n.id_ucitelj = u.id_uporabnik
-        -- Uporabimo ? namesto :user_id (1. parameter)
         JOIN ucenec_predmet up ON n.id_predmet = up.id_predmet AND up.id_ucenec = ? 
-        -- Uporabimo ? namesto :user_id (2. parameter)
         LEFT JOIN oddaja o ON n.id_naloga = o.id_naloga AND o.id_ucenec = ? AND o.status IN ('Oddano', 'Ocenjeno')
         WHERE o.id_oddaja IS NULL OR o.id_oddaja = (
-            -- Subquery za pridobitev zadnje veljavne oddaje
             SELECT id_oddaja FROM oddaja 
-            -- Uporabimo ? namesto :user_id (3. parameter)
             WHERE id_naloga = n.id_naloga AND id_ucenec = ? 
             ORDER BY datum_oddaje DESC LIMIT 1
         )
-        ORDER BY n.rok_oddaje DESC;
     ";
-    
+
+    // Gradimo dodatne WHERE pogoje za filtriranje
+    $whereClauses = [];
+    $params = [$user_id, $user_id, $user_id]; // prve tri ? za user_id v query
+
+    if ($filter_predmet > 0) {
+        $whereClauses[] = "n.id_predmet = ?";
+        $params[] = $filter_predmet;
+    }
+    if (!empty($filter_from)) {
+        $from_dt = date('Y-m-d 00:00:00', strtotime($filter_from));
+        $whereClauses[] = "n.rok_oddaje >= ?";
+        $params[] = $from_dt;
+    }
+    if (!empty($filter_to)) {
+        $to_dt = date('Y-m-d 23:59:59', strtotime($filter_to));
+        $whereClauses[] = "n.rok_oddaje <= ?";
+        $params[] = $to_dt;
+    }
+
+    if (!empty($whereClauses)) {
+        $sql_naloge .= " AND " . implode(" AND ", $whereClauses);
+    }
+
+    $sql_naloge .= " ORDER BY n.rok_oddaje DESC;";
+
     $stmt_naloge = $pdo->prepare($sql_naloge);
-    
-    // KLJUČNA SPREMEMBA: Posredujemo vrednost $user_id trikrat, za vsak ?
-    $stmt_naloge->execute([$user_id, $user_id, $user_id]); 
+    $stmt_naloge->execute($params);
     
     $vse_naloge_ucenec = $stmt_naloge->fetchAll();
 
@@ -432,7 +458,7 @@ foreach ($vse_naloge_ucenec as $naloga) {
                    data-id-predmet="<?php echo htmlspecialchars($predmet['id_predmet']); ?>"
                    data-ime-predmeta="<?php echo htmlspecialchars($predmet['ime_predmeta']); ?>">
                     <?php echo htmlspecialchars($predmet['ime_predmeta']); ?>
-                    <small style="display: block; color: #888;">Učitelj: <?php echo htmlspecialchars($predmet['ime_ucitelja'] . ' ' . $predmet['priimek_ucitelja']); ?></small>
+                    <small style="display: block; color: #888;">Učitelji: <?php echo htmlspecialchars($predmet['ucitelji'] ?? ''); ?></small>
                 </a>
             <?php endforeach; ?>
         <?php endif; ?>
@@ -440,6 +466,28 @@ foreach ($vse_naloge_ucenec as $naloga) {
     
     <div class="main-content">
         <h2>Pregled nalog</h2>
+
+        <!-- FILTER FORM -->
+        <form id="filter-form" method="get" style="margin-bottom:15px; display:flex; gap:10px; align-items:center;">
+            <label for="predmet">Predmet:</label>
+            <select name="predmet" id="predmet">
+                <option value="0">Vsi predmeti</option>
+                <?php foreach ($predmeti_ucenec as $p): ?>
+                    <option value="<?php echo (int)$p['id_predmet']; ?>" <?php echo ($filter_predmet == $p['id_predmet']) ? 'selected' : ''; ?>>
+                        <?php echo htmlspecialchars($p['ime_predmeta']); ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+
+            <label for="from">Od:</label>
+            <input type="date" id="from" name="from" value="<?php echo htmlspecialchars($filter_from); ?>">
+
+            <label for="to">Do:</label>
+            <input type="date" id="to" name="to" value="<?php echo htmlspecialchars($filter_to); ?>">
+
+            <button type="submit" style="padding:6px 10px;">Filtriraj</button>
+            <a href="ucenec_ucilnica.php" style="margin-left:8px; text-decoration:none;">Reset</a>
+        </form>
 
         <div class="tab-buttons">
             <button class="tab-button active" data-tab="nova-naloga">Neoddane / Za dopolnitev (<?php echo count($naloge_nova); ?>)</button>
@@ -511,7 +559,7 @@ foreach ($vse_naloge_ucenec as $naloga) {
                                     data-oddaja-besedilo="<?php echo htmlspecialchars($naloga['besedilo_oddaje'] ?? ''); ?>"
                                     data-oddaja-datoteka="<?php echo htmlspecialchars($naloga['oddaja_datoteka'] ?? ''); ?>"
                                     data-komentar-ucitelj="<?php echo htmlspecialchars($naloga['komentar_ucitelj'] ?? ''); ?>"
-                                    disabled
+                                    data-datum-oddaje="<?php echo htmlspecialchars($naloga['datum_oddaje'] ?? ''); ?>"
                                 >
                                     Prikaži
                                 </button>
@@ -525,7 +573,7 @@ foreach ($vse_naloge_ucenec as $naloga) {
         <div id="ocenjeno" class="tab-content">
             <?php if (empty($naloge_ocenjeno)): ?>
                 <p>Nimate ocenjenih nalog.</p>
-            <? else: ?>
+            <?php else: ?>
                 <ul class="naloga-list">
                     <?php foreach ($naloge_ocenjeno as $naloga): ?>
                         <li class="naloga-item ocenjeno">
@@ -666,12 +714,15 @@ foreach ($vse_naloge_ucenec as $naloga) {
             const oddajaInfoContainer = document.getElementById('oddaja-info-container');
             const ocenaInfo = document.getElementById('ocena-info');
             const formHeader = document.getElementById('form-header');
+            const oddajaDatum = this.dataset.datumOddaje; // datum oddaje (če obstaja)
+            const oddajaDatumEl = document.getElementById('oddaja-datum');
 
             if (statusOddaje && statusOddaje !== 'NULL') {
                 // Je že oddano
                 oddajaInfoContainer.style.display = 'block';
                 document.getElementById('oddaja-status').textContent = statusOddaje;
                 document.getElementById('oddaja-besedilo').textContent = oddajaBesedilo;
+                oddajaDatumEl.textContent = oddajaDatum ? ('Datum oddaje: ' + oddajaDatum) : '';
 
                 const oddajaDatotekaP = document.getElementById('oddaja-datoteka-p');
                 if (oddajaDatoteka) {
@@ -694,23 +745,38 @@ foreach ($vse_naloge_ucenec as $naloga) {
 
                 // Upravljanje forme za ponovno oddajo/prikaz
                 const submitBtn = oddajaForm.querySelector('button[type="submit"]');
-                if (statusOddaje === 'Oddano' && ocena === 'NULL') {
+                if (statusOddaje === 'Oddano' && (!ocena || ocena === 'NULL')) {
                     // Čaka na oceno - onemogoči oddajo in spremeni naslov
                     submitBtn.disabled = true;
                     submitBtn.textContent = 'Oddano (Čaka na oceno)';
                     formHeader.textContent = 'Oddana rešitev:';
-                } else if (ocena === 'ND') {
-                    // Za dopolnitev - omogoči oddajo in spremeni naslov
-                    submitBtn.disabled = false;
-                    submitBtn.textContent = 'Dopolni nalogo';
-                    formHeader.textContent = 'Dopolni nalogo:';
+                } else if (statusOddaje === 'Ocenjeno' && (ocena === 'ND' || ocena === 'ND')) {
+                    // Ocenjeno z ND - omogoči dopolnitev še 7 dni po datumu oddaje
+                    let canResubmit = false;
+                    if (oddajaDatum) {
+                        const dt = new Date(oddajaDatum.replace(/\./g,'-').replace(/ /,'T'));
+                        const until = new Date(dt.getTime() + 7*24*60*60*1000);
+                        const now = new Date();
+                        canResubmit = now <= until;
+                    }
+                    if (canResubmit) {
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = 'Dopolni nalogo';
+                        formHeader.textContent = 'Dopolni nalogo:';
+                    } else {
+                        submitBtn.disabled = true;
+                        submitBtn.textContent = 'Rok za dopolnitev potekel';
+                        formHeader.textContent = 'Oddana rešitev:';
+                    }
+
+                    ocenaInfo.style.display = 'block';
                 } else if (statusOddaje === 'Ocenjeno' && ocena !== 'ND') {
-                    // Ocenjeno - onemogoči oddajo in spremeni naslov
+                    // Ocenjeno (pozitivno) - onemogoči oddajo in spremeni naslov
                     submitBtn.disabled = true;
                     submitBtn.textContent = 'Ocenjeno';
                     formHeader.textContent = 'Ocenjena rešitev:';
                 } else {
-                    // Morda kakšno vmesno stanje, privzeto onemogoči
+                    // Privzeto: onemogoči oddajo (varno)
                     submitBtn.disabled = true;
                     submitBtn.textContent = 'Že oddano';
                     formHeader.textContent = 'Oddana rešitev:';
