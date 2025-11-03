@@ -30,8 +30,10 @@ $pdo->beginTransaction();
 try {
     $inserted_count = 0;
     
-    // 2. Vstavi izbrane predmete v tabelo ucenec_predmet (id_predmet in id_ucitelj)
-    $sql_insert = "INSERT INTO ucenec_predmet (id_ucenec, id_predmet, id_ucitelj) VALUES (?, ?, ?)";
+    // 2. Vstavi ali posodobi izbrane predmete v tabelo ucenec_predmet (id_predmet in id_ucitelj)
+    // Reši podvojene vnose z upsert (če že obstaja, posodobi učitelja)
+    $sql_insert = "INSERT INTO ucenec_predmet (id_ucenec, id_predmet, id_ucitelj) VALUES (?, ?, ?) 
+                   ON DUPLICATE KEY UPDATE id_ucitelj = VALUES(id_ucitelj)";
     $stmt_insert = $pdo->prepare($sql_insert);
 
     foreach ($choices as $id_predmet => $id_ucitelj) {
