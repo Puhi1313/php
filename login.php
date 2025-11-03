@@ -128,22 +128,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 10px 20px;
+      padding: 15px 30px;
     }
     header .logo {
       font-weight: bold;
+      font-size: 20px;
+      color: #596235;
+    }
+    nav {
+      display: flex;
+      gap: 12px;
+      align-items: center;
     }
     nav a {
-      margin-left: 20px;
       text-decoration: none;
-      color: black;
-      font-size: 14px;
+      color: #596235;
+      font-size: 15px;
+      font-weight: 500;
+      padding: 8px 16px;
+      border-radius: 8px;
+      transition: all 0.3s ease;
+      position: relative;
     }
     nav a:hover {
-      text-decoration: underline;
+      background: rgba(89, 98, 53, 0.1);
+      transform: translateY(-1px);
+    }
+    nav a:active {
+      transform: translateY(0);
     }
     .welcome{
         color: #cdcdb6;
+        text-shadow: 0 2px 8px rgba(0,0,0,0.15);
     }
     .hero {
         background-image: url(slike/misty_forest.jpg);
@@ -276,10 +292,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <header>
         <div class="logo">LOGO</div>
         <nav>
-            <a href="#stran1">stran1</a>
-            <a href="#stran2">stran2</a>
-            <a href="#stran3">stran3</a>
-            <a href="#stran4">stran4</a>
+            <a href="login.php">Prijava</a>
+            <a href="registration.php">Registracija</a>
         </nav>
     </header>
 

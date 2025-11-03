@@ -435,6 +435,33 @@ foreach ($vse_naloge_ucenec as $naloga) {
             background-color: #999;
             cursor: not-allowed;
         }
+
+        /* Drag & Drop area */
+        .dropzone {
+            position: relative;
+            border: 2px dashed #bfbfae;
+            border-radius: 14px;
+            background: #f6f7f1;
+            padding: 26px;
+            text-align: center;
+            color: #596235;
+            transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+            margin-bottom: 15px;
+        }
+        .dropzone:hover { box-shadow: 0 6px 16px rgba(0,0,0,0.06); }
+        .dropzone.dragover {
+            border-color: #80852f;
+            background: #eef0e1;
+        }
+        .dropzone .dz-icon { font-size: 42px; margin-bottom: 10px; display: block; }
+        .dropzone .dz-title { font-weight: 700; margin: 6px 0; }
+        .dropzone .dz-sub { color: #6c7450; margin-bottom: 12px; }
+        .dropzone .dz-browse { 
+            padding: 8px 15px; background: #596235; color: #fff; border: none; border-radius: 6px; cursor: pointer; 
+            transition: background 0.3s, transform 0.15s ease; font-family: "Raleway", sans-serif; font-size: 14px; font-weight: 500;
+        }
+        .dropzone .dz-browse:hover { background: #4a5230; transform: translateY(-1px); }
+        .dropzone .dz-file-name { margin-top: 8px; font-size: 14px; color: #6c7450; }
     </style>
 </head>
 <body>
@@ -636,8 +663,15 @@ foreach ($vse_naloge_ucenec as $naloga) {
             <label for="besedilo_oddaje">Besedilo oddaje (Opcija):</label>
             <textarea id="besedilo_oddaje_form" name="besedilo_oddaje" rows="6" placeholder="Vnesite svoje besedilo (navadno besedilo ali rešitev)"></textarea>
             
-            <label for="datoteka">Priloži datoteko (Opcija):</label>
-            <input type="file" id="datoteka_form" name="datoteka">
+            <label for="datoteka_form">Priloži datoteko (Opcija):</label>
+            <div id="dz-oddaja" class="dropzone">
+                <span class="dz-icon">☁️</span>
+                <div class="dz-title">Povlecite in spustite datoteko sem</div>
+                <div class="dz-sub">ALI</div>
+                <button type="button" class="dz-browse">Izberite datoteko</button>
+                <div class="dz-file-name" id="dz-oddaja-filename">Ni izbrane datoteke</div>
+                <input type="file" id="datoteka_form" name="datoteka" style="display:none;">
+            </div>
             <p style="font-size: 12px; color: #555;">*Če naložite novo datoteko pri ponovni oddaji, bo stara prebrisana.</p>
 
             <button type="submit">Oddaj nalogo</button>
@@ -655,11 +689,15 @@ foreach ($vse_naloge_ucenec as $naloga) {
         modal.style.display = "none";
         // Počistimo vsebino pri zapiranju
         oddajaForm.reset();
+        const dzFileName = document.getElementById('dz-oddaja-filename');
+        if (dzFileName) dzFileName.textContent = 'Ni izbrane datoteke';
     }
     window.onclick = function(event) {
         if (event.target == modal) {
             modal.style.display = "none";
             oddajaForm.reset();
+            const dzFileName = document.getElementById('dz-oddaja-filename');
+            if (dzFileName) dzFileName.textContent = 'Ni izbrane datoteke';
         }
     }
 
@@ -678,6 +716,13 @@ foreach ($vse_naloge_ucenec as $naloga) {
 
     document.querySelectorAll('.tab-button').forEach(button => {
         button.addEventListener('click', openTab);
+    });
+
+    // Initialize Drag & Drop for oddaja
+    initDropzone({
+        wrapperId: 'dz-oddaja',
+        inputId: 'datoteka_form',
+        fileNameId: 'dz-oddaja-filename'
     });
 
     // Funkcija za odpiranje modala in polnjenje podatkov
@@ -808,6 +853,57 @@ foreach ($vse_naloge_ucenec as $naloga) {
             modal.style.display = "block";
         });
     });
+
+    // Reusable Drag & Drop init
+    function initDropzone({ wrapperId, inputId, fileNameId }) {
+        const wrapper = document.getElementById(wrapperId);
+        const input = document.getElementById(inputId);
+        const fileName = document.getElementById(fileNameId);
+        if (!wrapper || !input) return;
+
+        const browseBtn = wrapper.querySelector('.dz-browse');
+
+        // Click to open dialog
+        if (browseBtn) browseBtn.addEventListener('click', () => input.click());
+        wrapper.addEventListener('click', (e) => {
+            if (e.target.classList.contains('dz-browse')) return;
+            input.click();
+        });
+
+        ['dragenter','dragover'].forEach(evt => {
+            wrapper.addEventListener(evt, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                wrapper.classList.add('dragover');
+            });
+        });
+        ['dragleave','dragend','drop'].forEach(evt => {
+            wrapper.addEventListener(evt, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                wrapper.classList.remove('dragover');
+            });
+        });
+
+        wrapper.addEventListener('drop', (e) => {
+            if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) {
+                input.files = e.dataTransfer.files;
+                updateDzFileName();
+            }
+        });
+
+        input.addEventListener('change', updateDzFileName);
+
+        function updateDzFileName() {
+            if (!fileName) return;
+            if (input.files && input.files.length) {
+                const names = Array.from(input.files).map(f => f.name).join(', ');
+                fileName.textContent = names;
+            } else {
+                fileName.textContent = 'Ni izbrane datoteke';
+            }
+        }
+    }
 
     // AJAX oddaja (using ajax_oddaja.php logic)
     oddajaForm.addEventListener('submit', async function(e) {

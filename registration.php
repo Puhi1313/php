@@ -108,15 +108,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     header .logo {
       font-weight: bold;
+      font-size: 20px;
+      color: #596235;
+    }
+    nav {
+      display: flex;
+      gap: 12px;
+      align-items: center;
     }
     nav a {
-      margin-left: 20px;
       text-decoration: none;
-      color: black;
-      font-size: 14px;
+      color: #596235;
+      font-size: 15px;
+      font-weight: 500;
+      padding: 8px 16px;
+      border-radius: 8px;
+      transition: all 0.3s ease;
+      position: relative;
     }
     nav a:hover {
-      text-decoration: underline;
+      background: rgba(89, 98, 53, 0.1);
+      transform: translateY(-1px);
+    }
+    nav a:active {
+      transform: translateY(0);
     }
 
     .container {

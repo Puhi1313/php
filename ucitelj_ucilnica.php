@@ -346,6 +346,29 @@ try {
             border-radius: 6px;
             font-family: "Raleway", sans-serif;
         }
+
+        /* Drag & Drop area */
+        .dropzone {
+            position: relative;
+            border: 2px dashed #bfbfae;
+            border-radius: 14px;
+            background: #f6f7f1;
+            padding: 26px;
+            text-align: center;
+            color: #596235;
+            transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+            margin-bottom: 15px;
+        }
+        .dropzone:hover { box-shadow: 0 6px 16px rgba(0,0,0,0.06); }
+        .dropzone.dragover {
+            border-color: #80852f;
+            background: #eef0e1;
+        }
+        .dropzone .dz-icon { font-size: 42px; margin-bottom: 10px; display: block; }
+        .dropzone .dz-title { font-weight: 700; margin: 6px 0; }
+        .dropzone .dz-sub { color: #6c7450; margin-bottom: 12px; }
+        .dropzone .dz-browse { display: inline-block; }
+        .dropzone .dz-file-name { margin-top: 8px; font-size: 14px; color: #6c7450; }
         
         /* Button styling for grading and other action buttons */
         button.pregled-oddaje-btn,
@@ -539,9 +562,16 @@ try {
                     </div>
                     <div>
                         <label for="datoteka">Priloži datoteko (opcija):</label>
-                        <input type="file" id="datoteka" name="datoteka" style="margin-bottom: 15px;">
+                        <div id="dz-nova-naloga" class="dropzone">
+                            <span class="dz-icon">☁️</span>
+                            <div class="dz-title">Povlecite in spustite datoteko sem</div>
+                            <div class="dz-sub">ALI</div>
+                            <button type="button" class="dz-browse btn-primary">Izberite datoteko</button>
+                            <div class="dz-file-name" id="dz-nova-naloga-filename">Ni izbrane datoteke</div>
+                            <input type="file" id="datoteka" name="datoteka" style="display:none;">
+                        </div>
                     </div>
-                    <button type="submit" style="padding: 10px 20px; background: #1c4587; color: white; border: none; cursor: pointer;">Objavi Nalogo</button>
+                    <button type="submit" class="btn-primary">Objavi Nalogo</button>
                 </form>
             </div>
         </div>
@@ -602,6 +632,13 @@ try {
         if (formNovaNaloga) {
             formNovaNaloga.addEventListener('submit', handleNalogaCreate);
         }
+
+        // Inicializiraj drag & drop komponento za nalaganje datotek
+        initDropzone({
+            wrapperId: 'dz-nova-naloga',
+            inputId: 'datoteka',
+            fileNameId: 'dz-nova-naloga-filename'
+        });
     });
 
 
@@ -655,6 +692,61 @@ try {
                 prikaziModalZaOcenjevanje(idOddaja, imeUcenca);
             });
         });
+    }
+
+    // Reusable Drag & Drop init
+    function initDropzone({ wrapperId, inputId, fileNameId }) {
+        const wrapper = document.getElementById(wrapperId);
+        const input = document.getElementById(inputId);
+        const fileName = document.getElementById(fileNameId);
+        if (!wrapper || !input) return;
+
+        const browseBtn = wrapper.querySelector('.dz-browse');
+
+        // Click to open dialog
+        if (browseBtn) browseBtn.addEventListener('click', () => input.click());
+        wrapper.addEventListener('click', (e) => {
+            // avoid double triggering when clicking browse button
+            if (e.target.classList.contains('dz-browse')) return;
+            input.click();
+        });
+
+        // Drag over/leave styling
+        ;['dragenter','dragover'].forEach(evt => {
+            wrapper.addEventListener(evt, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                wrapper.classList.add('dragover');
+            });
+        });
+        ;['dragleave','dragend','drop'].forEach(evt => {
+            wrapper.addEventListener(evt, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                wrapper.classList.remove('dragover');
+            });
+        });
+
+        // Handle drop
+        wrapper.addEventListener('drop', (e) => {
+            if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) {
+                input.files = e.dataTransfer.files;
+                updateDzFileName();
+            }
+        });
+
+        // Handle manual selection
+        input.addEventListener('change', updateDzFileName);
+
+        function updateDzFileName() {
+            if (!fileName) return;
+            if (input.files && input.files.length) {
+                const names = Array.from(input.files).map(f => f.name).join(', ');
+                fileName.textContent = names;
+            } else {
+                fileName.textContent = 'Ni izbrane datoteke';
+            }
+        }
     }
 
     // 3. Prikaz Modala za ocenjevanje
