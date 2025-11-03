@@ -425,6 +425,7 @@ foreach ($vse_naloge_ucenec as $naloga) {
     <div class="logo">E-Učilnica</div>
     <nav>
         <span>Pozdravljen, <?php echo htmlspecialchars($ime_priimek); ?> (Učenec)</span>
+        <a href="ucenec_profile.php">Moj profil</a>
         <a href="logout.php">Odjava</a>
     </nav>
 </header>
