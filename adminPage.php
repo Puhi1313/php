@@ -121,6 +121,7 @@ try {
         <thead>
             <tr>
                 <th>ID</th>
+                <th>Slika</th>
                 <th>Ime in Priimek</th>
                 <th>E-mail</th>
                 <th>Vloga</th>
@@ -131,11 +132,20 @@ try {
         </thead>
         <tbody>
             <?php if (empty($uporabniki)): ?>
-                <tr><td colspan="7" style="text-align: center;">Ni najdenih uporabnikov po izbranem filtru.</td></tr>
+                <tr><td colspan="8" style="text-align: center;">Ni najdenih uporabnikov po izbranem filtru.</td></tr>
             <?php else: ?>
                 <?php foreach ($uporabniki as $uporabnik): ?>
-                    <tr>
+                    <tr id="user-row-<?= htmlspecialchars($uporabnik['id_uporabnik']) ?>">
                         <td><?= htmlspecialchars($uporabnik['id_uporabnik']) ?></td>
+                        <td style="width:80px;">
+                            <?php if (!empty($uporabnik['icona_profila']) && file_exists(__DIR__ . DIRECTORY_SEPARATOR . $uporabnik['icona_profila'])): ?>
+                                <img src="<?= htmlspecialchars($uporabnik['icona_profila']) ?>" alt="slika" style="width:48px;height:48px;border-radius:50%;object-fit:cover;border:1px solid #ddd">
+                            <?php else: ?>
+                                <div style="width:48px;height:48px;border-radius:50%;background:#eee;display:flex;align-items:center;justify-content:center;color:#666;font-weight:700;">
+                                    <?= strtoupper(substr($uporabnik['ime'],0,1).substr($uporabnik['priimek'],0,1)) ?>
+                                </div>
+                            <?php endif; ?>
+                        </td>
                         <td><?= htmlspecialchars($uporabnik['ime'] . ' ' . $uporabnik['priimek']) ?></td>
                         <td><?= htmlspecialchars($uporabnik['email']) ?></td>
                         <td><?= htmlspecialchars(ucfirst($uporabnik['vloga'])) ?></td>
@@ -146,19 +156,19 @@ try {
                         </td>
                         <td><?= $uporabnik['prvi_vpis'] == 1 ? 'DA' : 'NE' ?></td>
                         <td>
-                            <button 
-                                class="edit-btn"
-                                onclick="openEditModal(
+                            <button class="edit-btn" onclick="openEditModal(
                                     <?= $uporabnik['id_uporabnik'] ?>, 
-                                    '<?= htmlspecialchars($uporabnik['ime']) ?>', 
-                                    '<?= htmlspecialchars($uporabnik['priimek']) ?>', 
-                                    '<?= htmlspecialchars($uporabnik['email']) ?>', 
-                                    '<?= htmlspecialchars($uporabnik['vloga']) ?>', 
-                                    '<?= htmlspecialchars($uporabnik['status']) ?>',
+                                    '<?= htmlspecialchars($uporabnik['ime'], ENT_QUOTES) ?>', 
+                                    '<?= htmlspecialchars($uporabnik['priimek'], ENT_QUOTES) ?>', 
+                                    '<?= htmlspecialchars($uporabnik['email'], ENT_QUOTES) ?>', 
+                                    '<?= htmlspecialchars($uporabnik['vloga'], ENT_QUOTES) ?>', 
+                                    '<?= htmlspecialchars($uporabnik['status'], ENT_QUOTES) ?>',
                                     '<?= $uporabnik['prvi_vpis'] ?>'
-                                )">
-                                Uredi
-                            </button>
+                                )">Uredi</button>
+
+                            <button style="background:#17a2b8;color:#fff;border:none;padding:5px 8px;border-radius:4px;cursor:pointer;margin-left:6px" onclick="triggerAdminUpload(<?= $uporabnik['id_uporabnik'] ?>)">Naloži sliko</button>
+
+                            <button style="background:#dc3545;color:#fff;border:none;padding:5px 8px;border-radius:4px;cursor:pointer;margin-left:6px" onclick="deleteUserPic(<?= $uporabnik['id_uporabnik'] ?>)">Izbriši sliko</button>
                         </td>
                     </tr>
                 <?php endforeach; ?>
@@ -210,6 +220,12 @@ try {
         </form>
     </div>
 </div>
+
+<!-- hidden upload form -->
+<form id="adminUploadForm" style="display:none" enctype="multipart/form-data" method="post">
+    <input type="file" name="profile_pic" id="admin_profile_pic_input" accept="image/*">
+    <input type="hidden" name="id_uporabnik" id="admin_upload_user_id">
+</form>
 
 <script>
     // JS za odpiranje/zapiranje modala in polnjenje podatkov
@@ -269,6 +285,55 @@ try {
             console.error('Error:', error);
         });
     });
+
+    // Admin upload/delete picture handlers
+    function triggerAdminUpload(userId) {
+        const input = document.getElementById('admin_profile_pic_input');
+        document.getElementById('admin_upload_user_id').value = userId;
+        input.value = '';
+        input.onchange = function() {
+            const fd = new FormData();
+            fd.append('profile_pic', input.files[0]);
+            fd.append('id_uporabnik', userId);
+
+            fetch('admin_ajax_upload_pic.php', {
+                method: 'POST',
+                body: fd
+            })
+            .then(r => r.json())
+            .then(res => {
+                if (res.success) {
+                    alert('Slika naložena');
+                    window.location.reload();
+                } else {
+                    alert('Napaka: ' + (res.message || 'Neznana napaka'));
+                }
+            }).catch(err => {
+                alert('Napaka pri komunikaciji: ' + err.message);
+            });
+        };
+        input.click();
+    }
+
+    function deleteUserPic(userId) {
+        if (!confirm('Ste prepričani, da želite izbrisati profilno sliko tega uporabnika?')) return;
+        fetch('admin_ajax_delete_pic.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id_uporabnik: userId })
+        })
+        .then(r => r.json())
+        .then(res => {
+            if (res.success) {
+                alert('Slika izbrisana');
+                window.location.reload();
+            } else {
+                alert('Napaka: ' + (res.message || 'Neznana napaka'));
+            }
+        }).catch(err => {
+            alert('Napaka pri komunikaciji: ' + err.message);
+        });
+    }
 </script>
 
 </body>
