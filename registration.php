@@ -90,14 +90,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=BBH+Sans+Hegarty&family=Climate+Crisis:YEAR@2009&display=swap" rel="stylesheet">
-  <meta charset="UTF-8" />
+  <link href="https://fonts.googleapis.com/css2?family=Momo+Trust+Display&family=Raleway:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Registracija</title>
   <style>
     body {
       margin: 0;
-      font-family: "BBH Sans Hegarty", sans-serif;
+      font-family: "Raleway", sans-serif;
       background: #f4f6f9;
     }
     header {
@@ -177,6 +176,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     .form-right {
       flex: 1;
       background-image: url("slike/corporate_memphis1.png");
+      background-size: cover; 
       display: flex;
       align-items: center;
       justify-content: center;
