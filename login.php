@@ -249,7 +249,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       opacity: 0;
       transition: opacity 300ms ease;
       font-size: 16px;
-      color: #333;
+      color: #596235;
       position: absolute;
       text-align: center;
     }
