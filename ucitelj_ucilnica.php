@@ -61,7 +61,7 @@ try {
     
     // 3. Pridobitev vseh nalog, ki jih je objavil ta učitelj
     $sql_naloge = "
-        SELECT n.id_naloga, n.naslov, n.datum_objave, n.rok_oddaje, p.ime_predmeta
+        SELECT n.id_naloga, n.id_predmet, n.naslov, n.datum_objave, n.rok_oddaje, p.ime_predmeta
         FROM naloga n
         JOIN predmet p ON n.id_predmet = p.id_predmet
         WHERE n.id_ucitelj = ?
@@ -155,6 +155,7 @@ try {
     <div class="tabs">
         <button class="tab-button active" onclick="openTab(event, 'ucenci')">Učenci in Oddaje</button>
         <button class="tab-button" onclick="openTab(event, 'naloge')">Moje Naloge</button>
+        <button class="tab-button" onclick="openTab(event, 'nova-naloga')">Nova Naloga</button>
     </div>
 
     <div id="ucenci" class="tab-content active">
@@ -212,24 +213,64 @@ try {
                                 data-id-naloga="<?= $naloga['id_naloga'] ?>"
                                 data-id-predmet="<?= $naloga['id_predmet'] ?>"
                                 data-ime-predmeta="<?= htmlspecialchars($naloga['ime_predmeta']) ?>"
+                                data-naslov="<?= htmlspecialchars($naloga['naslov']) ?>"
                             >
-                                <strong><?= htmlspecialchars($naloga['naslov']) ?></strong> (<?= htmlspecialchars($naloga['ime_predmeta']) ?>)
+                                <strong><?= htmlspecialchars($naloga['naslov']) ?></strong>
                             </div>
                         <?php endforeach; ?>
                     <?php endforeach; ?>
                 <?php endif; ?>
                 
-                <hr style="margin-top: 20px;">
-                <button onclick="prikaziObrazecZaNovoNalogo()" style="width: 100%; padding: 10px; background: green; color: white; border: none; cursor: pointer;">
-                    Objavi Novo Nalogo
-                </button>
+                
             </div>
             
             <div class="right-panel">
                 <h3 id="naloga-detajli-header">Izberite nalogo ali objavite novo</h3>
                 <div id="naloga-detajli-vsebina">
-                    <p>Za dodajanje nove naloge uporabite gumb na levi 'Objavi Novo Nalogo'.</p>
+                    <p>Na levi izberite nalogo za pregled. Za ustvarjanje nove naloge odprite zavihek "Nova Naloga".</p>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="nova-naloga" class="tab-content">
+        <div class="split-content">
+            <div class="left-panel">
+                <h4>Nova Naloga</h4>
+                <p>Ustvarite novo nalogo in jo dodelite predmetu.</p>
+            </div>
+            <div class="right-panel">
+                <h3>Objavi Novo Nalogo</h3>
+                <form id="nova-naloga-form" method="POST" enctype="multipart/form-data">
+                    <div>
+                        <label for="id_predmet">Izberi Predmet:</label>
+                        <select id="id_predmet" name="id_predmet" required style="width: 100%; padding: 8px; margin-bottom: 10px;">
+                            <option value="">-- Izberi predmet --</option>
+                            <?php 
+                            foreach (array_values($ucenci_po_predmetih) as $predmet_data) {
+                                echo '<option value="' . htmlspecialchars($predmet_data['id_predmet']) . '">' . htmlspecialchars($predmet_data['ime_predmeta']) . '</option>';
+                            }
+                            ?>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="naslov">Naslov naloge:</label>
+                        <input type="text" id="naslov" name="naslov" required style="width: 100%; padding: 8px; margin-bottom: 10px;">
+                    </div>
+                    <div>
+                        <label for="rok_oddaje">Rok oddaje:</label>
+                        <input type="datetime-local" id="rok_oddaje" name="rok_oddaje" required style="width: 100%; padding: 8px; margin-bottom: 10px;">
+                    </div>
+                    <div>
+                        <label for="opis_naloge">Opis naloge:</label>
+                        <textarea id="opis_naloge" name="opis_naloge" rows="8" style="width: 100%; padding: 8px; margin-bottom: 10px;"></textarea>
+                    </div>
+                    <div>
+                        <label for="datoteka">Priloži datoteko (opcija):</label>
+                        <input type="file" id="datoteka" name="datoteka" style="margin-bottom: 15px;">
+                    </div>
+                    <button type="submit" style="padding: 10px 20px; background: #1c4587; color: white; border: none; cursor: pointer;">Objavi Nalogo</button>
+                </form>
             </div>
         </div>
     </div>
@@ -265,8 +306,8 @@ try {
         
         // Ponastavitev vsebine ob preklopu
         if (tabName === 'naloge') {
-            document.getElementById('naloga-detajli-header').textContent = 'Izberite nalogo ali objavite novo';
-            document.getElementById('naloga-detajli-vsebina').innerHTML = '<p>Za dodajanje nove naloge uporabite gumb na levi \'Objavi Novo Nalogo\'.</p>';
+            document.getElementById('naloga-detajli-header').textContent = 'Izberite nalogo';
+            document.getElementById('naloga-detajli-vsebina').innerHTML = '<p>Na levi izberite eno od vaših nalog za ogled podrobnosti.</p>';
         }
     }
     
@@ -283,6 +324,12 @@ try {
         document.querySelectorAll('.naloga-item').forEach(item => {
             item.addEventListener('click', handleNalogaSelect);
         });
+
+        // Nastavi poslušalca za formo za novo nalogo v zavihku "Nova Naloga"
+        const formNovaNaloga = document.getElementById('nova-naloga-form');
+        if (formNovaNaloga) {
+            formNovaNaloga.addEventListener('submit', handleNalogaCreate);
+        }
     });
 
 
@@ -409,55 +456,7 @@ try {
     // ZAVIHEK: MOJE NALOGE (Upravljanje z nalogami)
     // ----------------------------------------------------
 
-    // 1. Prikaz forme za novo nalogo
-    function prikaziObrazecZaNovoNalogo() {
-        // Prikaži header in naloži obrazec (za to potrebujemo ID-je predmetov)
-        document.querySelectorAll('.naloga-item').forEach(i => i.classList.remove('active'));
-        
-        const detajliVsebina = document.getElementById('naloga-detajli-vsebina');
-        document.getElementById('naloga-detajli-header').textContent = 'Objavi Novo Nalogo';
-        
-        // Ustvarimo formo dinamično, ker potrebujemo seznam predmetov
-        let htmlForm = `
-            <form id="naloga-form" method="POST" enctype="multipart/form-data">
-                <div>
-                    <label for="id_predmet">Izberi Predmet:</label>
-                    <select id="id_predmet" name="id_predmet" required style="width: 100%; padding: 8px; margin-bottom: 10px;">
-                        <option value="">-- Izberi predmet --</option>
-                        <?php 
-                        foreach (array_values($ucenci_po_predmetih) as $predmet_data) {
-                            echo '<option value="' . htmlspecialchars($predmet_data['id_predmet']) . '">' . htmlspecialchars($predmet_data['ime_predmeta']) . '</option>';
-                        }
-                        ?>
-                    </select>
-                </div>
-                <div>
-                    <label for="naslov">Naslov naloge:</label>
-                    <input type="text" id="naslov" name="naslov" required style="width: 100%; padding: 8px; margin-bottom: 10px;">
-                </div>
-                <div>
-                    <label for="rok_oddaje">Rok oddaje:</label>
-                    <input type="datetime-local" id="rok_oddaje" name="rok_oddaje" required style="width: 100%; padding: 8px; margin-bottom: 10px;">
-                </div>
-                <div>
-                    <label for="opis_naloge">Opis naloge:</label>
-                    <textarea id="opis_naloge" name="opis_naloge" rows="8" style="width: 100%; padding: 8px; margin-bottom: 10px;"></textarea>
-                </div>
-                <div>
-                    <label for="datoteka">Priloži datoteko (opcija):</label>
-                    <input type="file" id="datoteka" name="datoteka" style="margin-bottom: 15px;">
-                </div>
-                <button type="submit" style="padding: 10px 20px; background: #1c4587; color: white; border: none; cursor: pointer;">Objavi Nalogo</button>
-            </form>
-        `;
-        detajliVsebina.innerHTML = htmlForm;
-        
-        // Nastavi poslušalca za formo za ustvarjanje naloge
-        const nalogaForm = document.getElementById('naloga-form');
-        if (nalogaForm) {
-            nalogaForm.addEventListener('submit', handleNalogaCreate);
-        }
-    }
+    // 1. (Odstranjeno) Prikaz forme za novo nalogo - zdaj ima svoj zavihek "Nova Naloga"
     
     // 2. Obravnava ustvarjanja naloge
     async function handleNalogaCreate(e) {
@@ -501,6 +500,7 @@ try {
         const idNaloga = item.dataset.idNaloga;
         const idPredmet = item.dataset.idPredmet;
         const imePredmeta = item.dataset.imePredmeta;
+        const naslovNaloge = item.dataset.naslov;
         
         // Odstrani 'active' iz vseh in dodaj izbranemu
         document.querySelectorAll('.naloga-item').forEach(i => i.classList.remove('active'));
@@ -509,7 +509,7 @@ try {
         const detajliHeader = document.getElementById('naloga-detajli-header');
         const detajliVsebina = document.getElementById('naloga-detajli-vsebina');
         
-        detajliHeader.textContent = `Pregled naloge: ${imePredmeta}`;
+        detajliHeader.textContent = `Pregled naloge: ${naslovNaloge}`;
         detajliVsebina.innerHTML = 'Nalaganje detajlov...';
 
         try {

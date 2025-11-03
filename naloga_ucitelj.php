@@ -23,11 +23,11 @@ if (!empty($naloga)) {
             SELECT up.id_uporabnik, up.ime, up.priimek
             FROM ucenec_predmet ucp
             JOIN uporabnik up ON ucp.id_ucenec = up.id_uporabnik
-            WHERE ucp.id_predmet = ?
+            WHERE ucp.id_predmet = ? AND ucp.id_ucitelj = ?
             ORDER BY up.priimek ASC
         ";
         $stmt_vsi_ucenci = $pdo->prepare($sql_vsi_ucenci);
-        $stmt_vsi_ucenci->execute([$id_predmet]);
+        $stmt_vsi_ucenci->execute([$id_predmet, $id_ucitelja]);
         $vsi_ucenci = $stmt_vsi_ucenci->fetchAll(PDO::FETCH_GROUP|PDO::FETCH_UNIQUE);
 
         // Združite podatke: ustvarite seznam vseh učencev s statusom oddaje
@@ -103,51 +103,12 @@ if (!empty($naloga)) {
     </div>
 
 
-    <h3 style="margin-top: 30px;">Oddaje Učencev (Skupaj: <?php echo count($ucenci_za_prikaz); ?>)</h3>
-    <table style="width: 100%; border-collapse: collapse;">
-        <thead>
-            <tr style="background-color: #eee;">
-                <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Učenec</th>
-                <th style="padding: 10px; border: 1px solid #ddd; text-align: center;">Status</th>
-                <th style="padding: 10px; border: 1px solid #ddd; text-align: center;">Datum Oddaje</th>
-                <th style="padding: 10px; border: 1px solid #ddd; text-align: center;">Ocena</th>
-                <th style="padding: 10px; border: 1px solid #ddd; text-align: center;">Akcija</th>
-            </tr>
-        </thead>
-        <tbody>
-            <?php foreach ($ucenci_za_prikaz as $podatki): 
-                $status_oddaje = htmlspecialchars($podatki['status'] ?? 'Ni oddano');
-                $barva = 'gray';
-                if ($status_oddaje === 'Oddano') {
-                    $barva = '#007bff'; // Modra
-                } elseif ($status_oddaje === 'Ocenjeno') {
-                    $barva = '#28a745'; // Zelena
-                } elseif ($status_oddaje === 'Ni oddano') {
-                    $barva = '#dc3545'; // Rdeča
-                }
-            ?>
-            <tr>
-                <td style="padding: 8px; border: 1px solid #ddd;"><?php echo htmlspecialchars($podatki['ime'] . ' ' . $podatki['priimek']); ?></td>
-                <td style="padding: 8px; border: 1px solid #ddd; text-align: center; color: white; background-color: <?php echo $barva; ?>; font-weight: bold;"><?php echo $status_oddaje; ?></td>
-                <td style="padding: 8px; border: 1px solid #ddd; text-align: center;"><?php echo $podatki['datum_oddaje'] ? date('d.m.Y H:i', strtotime($podatki['datum_oddaje'])) : '-'; ?></td>
-                <td style="padding: 8px; border: 1px solid #ddd; text-align: center; font-weight: bold;"><?php echo htmlspecialchars($podatki['ocena'] ?? '-'); ?></td>
-                <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">
-                    <?php if (isset($podatki['id_oddaja'])): ?>
-                        <button 
-                            data-oddaja-id="<?php echo $podatki['id_oddaja']; ?>" 
-                            data-ucenec-ime="<?php echo htmlspecialchars($podatki['ime'] . ' ' . $podatki['priimek']); ?>"
-                            class="pregled-oddaje-btn"
-                            style="background: #007bff; color: white; border: none; padding: 5px 10px; cursor: pointer;">
-                            Pregled/Oceni
-                        </button>
-                    <?php else: ?>
-                        -
-                    <?php endif; ?>
-                </td>
-            </tr>
-            <?php endforeach; ?>
-        </tbody>
-    </table>
+    <h3 style="margin-top: 30px;">Prejemniki (Skupaj: <?php echo count($ucenci_za_prikaz); ?>)</h3>
+    <ul style="margin: 0; padding-left: 20px;">
+        <?php foreach ($ucenci_za_prikaz as $podatki): ?>
+            <li><?php echo htmlspecialchars($podatki['ime'] . ' ' . $podatki['priimek']); ?></li>
+        <?php endforeach; ?>
+    </ul>
 
 <?php else: ?>
 
