@@ -468,8 +468,24 @@ foreach ($vse_naloge_ucenec as $naloga) {
 
 <header>
     <div class="logo">E-Učilnica</div>
-    <nav>
-        <span>Pozdravljen, <?php echo htmlspecialchars($ime_priimek); ?> (Učenec)</span>
+    <nav style="display:flex;gap:12px;align-items:center;">
+        <?php
+            // get current user pic (use $user_id already set earlier)
+            $pic = '';
+            try {
+                $stmt = $pdo->prepare("SELECT icona_profila FROM uporabnik WHERE id_uporabnik = ?");
+                $stmt->execute([$user_id]);
+                $pic = $stmt->fetchColumn();
+            } catch (\Exception $e) { $pic = ''; }
+        ?>
+        <?php if (!empty($pic) && file_exists(__DIR__ . DIRECTORY_SEPARATOR . $pic)): ?>
+            <img src="<?php echo htmlspecialchars($pic); ?>" alt="Profil" style="width:36px;height:36px;border-radius:50%;object-fit:cover;border:2px solid #fff;">
+        <?php else: ?>
+            <div style="width:36px;height:36px;border-radius:50%;background:#2e8b57;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;">
+                <?php echo strtoupper(substr($ime_priimek,0,1)); ?>
+            </div>
+        <?php endif; ?>
+        <a href="ucenec_profile.php">Moj profil</a>
         <a href="logout.php">Odjava</a>
     </nav>
 </header>
