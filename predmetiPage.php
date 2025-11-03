@@ -164,6 +164,36 @@ try {
     .subject:hover .dropdown {
       display: block;
     }
+    /* Zaključi izbiro gumb */
+    #finish-selection {
+      margin: 24px auto 0;
+      padding: 12px 20px;
+      background: #3b3d15;
+      color: #ffffff;
+      border: 2px solid #80852f;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+      cursor: pointer;
+      display: none; /* ohrani začetno stanje */
+      transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.2s ease, color 0.2s ease;
+      box-shadow: 0 2px 0 rgba(59,61,21,0.6);
+    }
+    #finish-selection:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 0 rgba(59,61,21,0.6);
+      background: #80852f;
+      color: #1b1c08;
+    }
+    #finish-selection:active {
+      transform: translateY(0);
+      box-shadow: 0 1px 0 rgba(59,61,21,0.6);
+    }
+    #finish-selection:focus-visible {
+      outline: 3px solid #cdcdb6;
+      outline-offset: 2px;
+    }
   </style>
 </head>
 <body>

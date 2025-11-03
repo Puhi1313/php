@@ -119,32 +119,32 @@ function get_naloga_status($naloga) {
         if (strtoupper($naloga['ocena'] ?? '') === 'ND') {
             return [
                 'status' => 'Za dopolnitev',
-                'barva' => 'orange',
+                'barva' => '#d4a574',
                 'ikona' => '⚠️'
             ];
         } else {
             return [
                 'status' => 'Ocenjeno (' . htmlspecialchars($naloga['ocena']) . ')',
-                'barva' => 'green',
+                'barva' => '#6b8c7d',
                 'ikona' => '✅'
             ];
         }
     } elseif ($naloga['status'] === 'Oddano') {
         return [
             'status' => 'Oddano (Čaka na oceno)',
-            'barva' => 'blue',
+            'barva' => '#80852f',
             'ikona' => '📝'
         ];
     } elseif ($je_prepozno) {
         return [
             'status' => 'Pretečen rok',
-            'barva' => 'red',
+            'barva' => '#a85d4a',
             'ikona' => '❌'
         ];
     } else {
         return [
             'status' => $status,
-            'barva' => 'gray',
+            'barva' => '#cdcdb6',
             'ikona' => '🌟'
         ];
     }
@@ -182,11 +182,19 @@ foreach ($vse_naloge_ucenec as $naloga) {
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Momo+Trust+Display&family=Raleway:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
     <style>
+        html{
+            color: #596235;
+        }
         body {
             margin: 0;
             font-family: "Raleway", sans-serif;
-            background: #f4f6f9;
-            color: #333;
+            /* Harmonious layered background using existing palette */
+            background:
+                radial-gradient(900px 500px at 10% -10%, rgba(205, 205, 182, 0.65), rgba(205, 205, 182, 0) 70%),
+                radial-gradient(900px 500px at 110% 10%, rgba(128, 133, 47, 0.18), rgba(128, 133, 47, 0) 60%),
+                linear-gradient(180deg, #f7f8f3 0%, #eff1e4 45%, #e3e6d1 100%);
+            background-attachment: fixed;
+            color: #596235;
         }
         header {
             background: #cdcdb6;
@@ -199,12 +207,12 @@ foreach ($vse_naloge_ucenec as $naloga) {
         header .logo {
             font-weight: bold;
             font-size: 24px;
-            color: #1a252f;
+            color: #596235;
         }
         nav a {
             margin-left: 20px;
             text-decoration: none;
-            color: #1a252f;
+            color: #596235;
             font-size: 16px;
         }
         nav a:hover {
@@ -215,20 +223,23 @@ foreach ($vse_naloge_ucenec as $naloga) {
             max-width: 1200px;
             margin: 20px auto;
             background: #fff;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            border: 1px solid #cdcdb6;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
             min-height: 80vh;
         }
 
         /* Glavni Menu (Predmeti) */
         .left-menu {
             width: 250px;
-            background: #f8f8f8;
+            background: #f8f8f0;
             padding: 20px;
             border-right: 1px solid #ddd;
         }
         .left-menu h4 {
             margin-top: 0;
-            color: #1a252f;
+            color: #596235;
             border-bottom: 2px solid #cdcdb6;
             padding-bottom: 5px;
             margin-bottom: 15px;
@@ -239,16 +250,18 @@ foreach ($vse_naloge_ucenec as $naloga) {
             margin-bottom: 5px;
             background: #fff;
             border: 1px solid #ddd;
-            border-radius: 4px;
+            border-radius: 10px;
             text-decoration: none;
-            color: #333;
-            transition: background 0.2s, border-color 0.2s;
+            color: #596235;
+            transition: background 0.2s, border-color 0.2s, transform 0.15s ease, box-shadow 0.15s ease;
             cursor: pointer;
         }
         .predmet-item:hover, .predmet-item.active {
             background: #e6e6fa; /* Light purple for active/hover */
             border-color: #cdcdb6;
             font-weight: bold;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.06);
         }
 
         /* Glavna Vsebina (Naloge in Status) */
@@ -257,7 +270,7 @@ foreach ($vse_naloge_ucenec as $naloga) {
             padding: 20px;
         }
         .main-content h2 {
-            color: #1a252f;
+            color: #596235;
             border-bottom: 2px solid #cdcdb6;
             padding-bottom: 10px;
             margin-bottom: 20px;
@@ -276,8 +289,8 @@ foreach ($vse_naloge_ucenec as $naloga) {
             padding: 10px 15px;
             cursor: pointer;
             margin-right: 5px;
-            border-radius: 5px 5px 0 0;
-            transition: background 0.3s;
+            border-radius: 10px 10px 0 0;
+            transition: background 0.3s, transform 0.15s ease;
         }
         .tab-button.active {
             background: #fff;
@@ -285,11 +298,13 @@ foreach ($vse_naloge_ucenec as $naloga) {
             border-bottom: 2px solid #fff;
             font-weight: bold;
         }
+        .tab-button:hover { transform: translateY(-1px); }
         .tab-content {
             display: none;
             padding: 10px;
-            border: 1px solid #ddd;
+            border: 1px solid #cdcdb6;
             border-top: none;
+            border-radius: 0 10px 10px 10px;
         }
         .tab-content.active {
             display: block;
@@ -303,19 +318,22 @@ foreach ($vse_naloge_ucenec as $naloga) {
         .naloga-item {
             padding: 15px;
             margin-bottom: 10px;
-            border: 1px solid #ddd;
+            margin-left: 15px;
+            border: 1px solid #e2e2e2;
             border-left: 5px solid;
-            border-radius: 4px;
+            border-radius: 10px;
             background: #fff;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.2s ease;
         }
-        .naloga-item.nova { border-left-color: gray; }
-        .naloga-item.oddano { border-left-color: blue; }
-        .naloga-item.ocenjeno { border-left-color: green; }
-        .naloga-item.dopolnitev { border-left-color: orange; }
-        .naloga-item.pretecen { border-left-color: red; }
+        .naloga-item:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(0,0,0,0.07); }
+        .naloga-item.nova { border-left-color: #cdcdb6; }
+        .naloga-item.oddano { border-left-color: #80852f; }
+        .naloga-item.ocenjeno { border-left-color: #6b8c7d; }
+        .naloga-item.dopolnitev { border-left-color: #d4a574; }
+        .naloga-item.pretecen { border-left-color: #a85d4a; }
 
         .naloga-details {
             flex-grow: 1;
@@ -323,12 +341,12 @@ foreach ($vse_naloge_ucenec as $naloga) {
         .naloga-details h5 {
             margin: 0 0 5px 0;
             font-size: 18px;
-            color: #1a252f;
+            color: #596235;
         }
         .naloga-details p {
             margin: 0;
             font-size: 14px;
-            color: #666;
+            color: #596235;
         }
 
         .naloga-status {
@@ -344,7 +362,7 @@ foreach ($vse_naloge_ucenec as $naloga) {
             margin-bottom: 5px;
         }
         .naloga-status button {
-            background: #007bff;
+            background: #596235;
             color: white;
             border: none;
             padding: 8px 15px;
@@ -530,7 +548,7 @@ foreach ($vse_naloge_ucenec as $naloga) {
                                 <p>Predmet: <?php echo htmlspecialchars($naloga['ime_predmeta']); ?> | Oddano: <?php echo date('d.m.Y H:i', strtotime($naloga['datum_oddaje'])); ?></p>
                             </div>
                             <div class="naloga-status">
-                                <span class="status-tag" style="background-color: blue;"><?php echo $naloga['status_info']['ikona']; ?> <?php echo htmlspecialchars($naloga['status_info']['status']); ?></span>
+                                <span class="status-tag" style="background-color: <?php echo $naloga['status_info']['barva']; ?>;"><?php echo $naloga['status_info']['ikona']; ?> <?php echo htmlspecialchars($naloga['status_info']['status']); ?></span>
                                 <button class="oddaja-btn" 
                                     data-id-naloga="<?php echo htmlspecialchars($naloga['id_naloga']); ?>"
                                     data-naslov="<?php echo htmlspecialchars($naloga['naslov']); ?>"
