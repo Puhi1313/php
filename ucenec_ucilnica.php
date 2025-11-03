@@ -153,12 +153,12 @@ foreach ($vse_naloge_ucenec as $naloga) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Učilnica - Učenec</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=BBH+Sans+Hegarty:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Momo+Trust+Display&family=Raleway:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
     <style>
         body {
             margin: 0;
-            font-family: 'BBH Sans Hegarty', sans-serif;
+            font-family: "Raleway", sans-serif;
             background: #f4f6f9;
             color: #333;
         }
