@@ -39,35 +39,84 @@ try {
     $rok_oddaje = new DateTime($naloga_data['rok_oddaje']);
     $danes = new DateTime();
     
-    // 2. Preverimo obstoječo oddajo (vedno zadnjo oddajo za to nalogo)
-    $sql_oddaja = "SELECT id_oddaja, pot_na_strezniku, status, ocena FROM oddaja WHERE id_naloga = ? AND id_ucenec = ? ORDER BY id_oddaja DESC LIMIT 1";
-    $stmt_oddaja = $pdo->prepare($sql_oddaja);
-    $stmt_oddaja->execute([$id_naloga, $user_id]);
-    $oddaja_data = $stmt_oddaja->fetch();
-
-    if ($oddaja_data) {
+    // 2. Check for failing submission with active podaljsan_rok (CRITICAL: check ANY failing submission, not just latest)
+    $sql_failing = "SELECT id_oddaja, pot_na_strezniku, status, ocena, podaljsan_rok 
+                    FROM oddaja 
+                    WHERE id_naloga = ? AND id_ucenec = ? 
+                    AND ocena = '1' 
+                    AND podaljsan_rok IS NOT NULL 
+                    AND podaljsan_rok > NOW()
+                    AND status = 'Dopolnitev'
+                    ORDER BY datum_oddaje DESC LIMIT 1";
+    $stmt_failing = $pdo->prepare($sql_failing);
+    $stmt_failing->execute([$id_naloga, $user_id]);
+    $failing_submission = $stmt_failing->fetch();
+    
+    // 3. Get latest submission (for checking if already submitted and waiting for grade)
+    $sql_latest = "SELECT id_oddaja, pot_na_strezniku, status, ocena, podaljsan_rok 
+                   FROM oddaja 
+                   WHERE id_naloga = ? AND id_ucenec = ? 
+                   ORDER BY id_oddaja DESC LIMIT 1";
+    $stmt_latest = $pdo->prepare($sql_latest);
+    $stmt_latest->execute([$id_naloga, $user_id]);
+    $latest_submission = $stmt_latest->fetch();
+    
+    $previous_oddaja_id = null;
+    $ze_oddano = false;
+    $rok_za_preverjanje = $rok_oddaje;
+    
+    // CRITICAL: If there's a failing submission with active podaljsan_rok, allow re-submission
+    if ($failing_submission) {
+        $allow_re_submission = true;
         $ze_oddano = true;
-        // Dovolimo ponovno oddajo/dopolnitev samo, če je status 'Ocenjeno' in ocena 'ND'
-        if ($oddaja_data['status'] === 'Ocenjeno' && strtoupper($oddaja_data['ocena'] ?? '') === 'ND') {
-            $allow_re_submission = true;
-        } elseif ($oddaja_data['status'] === 'Oddano' && $oddaja_data['ocena'] === NULL) {
-            // Če je že oddano in čaka na oceno, ne dovolimo oddaje (razen če bi bila možnost preklic oddaje)
-            echo json_encode(["success" => false, "message" => "Naloga je že oddana in čaka na oceno. Posodobitev ni mogoča."]);
-            exit;
-        } elseif ($oddaja_data['status'] === 'Ocenjeno' && strtoupper($oddaja_data['ocena'] ?? '') !== 'ND') {
-            // Če je končno ocenjeno, ne dovolimo ponovne oddaje
-            echo json_encode(["success" => false, "message" => "Naloga je že ocenjena. Ponovna oddaja ni mogoča."]);
+        $previous_oddaja_id = $failing_submission['id_oddaja'];
+        $rok_za_preverjanje = new DateTime($failing_submission['podaljsan_rok']);
+        
+        // Check if extended deadline has passed
+        if ($danes > $rok_za_preverjanje) {
+            echo json_encode(["success" => false, "message" => "Rok za dopolnitev je potekel."]);
             exit;
         }
+    } elseif ($latest_submission) {
+        $ze_oddano = true;
+        $previous_oddaja_id = $latest_submission['id_oddaja'];
+        
+        // Check latest submission status
+        if ($latest_submission['status'] === 'Oddano' && $latest_submission['ocena'] === NULL) {
+            // Already submitted and waiting for grade - don't allow another submission
+            echo json_encode(["success" => false, "message" => "Naloga je že oddana in čaka na oceno. Posodobitev ni mogoča."]);
+            exit;
+        } elseif ($latest_submission['status'] === 'Ocenjeno' && $latest_submission['ocena'] != '1' && strtoupper($latest_submission['ocena'] ?? '') !== 'ND') {
+            // Finally graded (not 1 or ND) - don't allow re-submission
+            echo json_encode(["success" => false, "message" => "Naloga je že ocenjena. Ponovna oddaja ni mogoča."]);
+            exit;
+        } elseif ($latest_submission['status'] === 'Dopolnitev' && strtoupper($latest_submission['ocena'] ?? '') === 'ND') {
+            // ND grade - allow re-submission within 7 days
+            $allow_re_submission = true;
+            if ($latest_submission['datum_oddaje']) {
+                $dt = new DateTime($latest_submission['datum_oddaje']);
+                $until = new DateTime($dt->format('Y-m-d H:i:s'));
+                $until->modify('+7 days');
+                if ($danes > $until) {
+                    echo json_encode(["success" => false, "message" => "Rok za dopolnitev je potekel."]);
+                    exit;
+                }
+            }
+        }
+        
+        // Use podaljsan_rok if available from latest submission
+        if (!empty($latest_submission['podaljsan_rok'])) {
+            $rok_za_preverjanje = new DateTime($latest_submission['podaljsan_rok']);
+        }
     }
-
-    // 3. Preverjanje roka
-    if ($danes > $rok_oddaje && !$allow_re_submission) {
+    
+    // 4. Final deadline check (for new submissions or non-failing re-submissions)
+    if (!$allow_re_submission && $danes > $rok_za_preverjanje) {
         echo json_encode(["success" => false, "message" => "Rok za oddajo je potekel."]);
         exit;
     }
     
-    // 4. Obdelava datoteke
+    // 5. Obdelava datoteke
     if (isset($_FILES['datoteka']) && $_FILES['datoteka']['error'] === UPLOAD_ERR_OK) {
         $upload_dir = 'uploads/oddaje/';
         if (!is_dir($upload_dir)) {
@@ -82,20 +131,17 @@ try {
         if (move_uploaded_file($_FILES['datoteka']['tmp_name'], $target_file)) {
             $pot_na_strezniku = $target_file;
             
-            // Če gre za posodobitev oddaje in je bila prejšnja datoteka, jo zbrišemo
-            if ($ze_oddano && $oddaja_data['pot_na_strezniku']) {
-                @unlink($oddaja_data['pot_na_strezniku']);
-            }
+            // Note: We don't delete old files on re-submission since we're preserving history
+            // Old submissions are marked as 'Zamenjana' but files are kept for reference
 
         } else {
             echo json_encode(["success" => false, "message" => "Napaka pri nalaganju datoteke."]);
             exit;
         }
     } else {
-        // Če ni naložene nove datoteke, ohranimo staro pot pri posodobitvi
-        if ($ze_oddano) {
-            $pot_na_strezniku = $oddaja_data['pot_na_strezniku'];
-        }
+        // If no new file is uploaded for re-submission, the submission must include text
+        // We don't carry over old file paths in re-submissions - student must provide new content
+        $pot_na_strezniku = null;
     }
 
     // Preverimo, ali je vneseno besedilo ALI naložena datoteka
@@ -104,22 +150,45 @@ try {
         exit;
     }
     
-    // 5. Vstavitev ali Posodobitev v bazo
-    if ($ze_oddano) {
-        // Posodobimo (ponovna oddaja/dopolnitev). Ponastavimo oceno in komentar.
-        $sql_update = "UPDATE oddaja SET datum_oddaje = NOW(), besedilo_oddaje = ?, pot_na_strezniku = ?, status = 'Oddano', ocena = NULL, komentar_ucitelj = NULL
-                       WHERE id_oddaja = ?";
-        $stmt_oddaja = $pdo->prepare($sql_update);
-        $stmt_oddaja->execute([$besedilo_oddaje, $pot_na_strezniku, $oddaja_data['id_oddaja']]);
-        $sporocilo = "Oddaja uspešno posodobljena!";
+    // 6. Vstavitev v bazo (ALWAYS INSERT for re-submissions to preserve history)
+    $pdo->beginTransaction();
+    
+    try {
+        if ($ze_oddano && $allow_re_submission) {
+            // This is a re-submission (failing task or ND grade)
+            // Mark failing submission(s) and any active 'Oddano' submissions as 'Zamenjana' to preserve history
+            // This ensures the failing submission (ocena=1) is preserved but marked inactive
+            $sql_update_previous = "UPDATE oddaja 
+                                    SET status = 'Zamenjana' 
+                                    WHERE id_naloga = ? 
+                                    AND id_ucenec = ? 
+                                    AND (status = 'Dopolnitev' OR status = 'Oddano')
+                                    AND status != 'Zamenjana'";
+            $stmt_update_previous = $pdo->prepare($sql_update_previous);
+            $stmt_update_previous->execute([$id_naloga, $user_id]);
+            
+            // INSERT new submission (do not include ocena or podaljsan_rok - these are set by teacher)
+            $sql_insert = "INSERT INTO oddaja (id_naloga, id_ucenec, besedilo_oddaje, pot_na_strezniku, status) 
+                           VALUES (?, ?, ?, ?, 'Oddano')";
+            $stmt_oddaja = $pdo->prepare($sql_insert);
+            $stmt_oddaja->execute([$id_naloga, $user_id, $besedilo_oddaje, $pot_na_strezniku]);
+            $sporocilo = "Dopolnitev uspešno oddana!";
+            
+        } elseif (!$ze_oddano) {
+            // First submission - INSERT new record
+            $sql_insert = "INSERT INTO oddaja (id_naloga, id_ucenec, besedilo_oddaje, pot_na_strezniku, status) 
+                           VALUES (?, ?, ?, ?, 'Oddano')";
+            $stmt_oddaja = $pdo->prepare($sql_insert);
+            $stmt_oddaja->execute([$id_naloga, $user_id, $besedilo_oddaje, $pot_na_strezniku]);
+            $sporocilo = "Naloga uspešno oddana!";
+        } else {
+            throw new Exception("Napaka: Oddaja ni mogoča.");
+        }
         
-    } else {
-        // Vstavimo (prva oddaja)
-        $sql_insert = "INSERT INTO oddaja (id_naloga, id_ucenec, besedilo_oddaje, pot_na_strezniku) 
-                       VALUES (?, ?, ?, ?)";
-        $stmt_oddaja = $pdo->prepare($sql_insert);
-        $stmt_oddaja->execute([$id_naloga, $user_id, $besedilo_oddaje, $pot_na_strezniku]);
-        $sporocilo = "Naloga uspešno oddana!";
+        $pdo->commit();
+    } catch (\PDOException $e) {
+        $pdo->rollBack();
+        throw $e;
     }
 
     echo json_encode(["success" => true, "message" => $sporocilo]);

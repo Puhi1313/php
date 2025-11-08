@@ -12,6 +12,7 @@ $user_id = $_SESSION['user_id'];
 $ime_priimek = 'Neznan uporabnik';
 $ucenci_po_predmetih = [];
 $naloge_po_datumu = [];
+$predmeti_menu = []; // List of all subjects assigned to teacher from ucitelj_predmet table
 $vloga = $_SESSION['vloga']; // Uporabno za razlikovanje admin/ucitelj
 
 try {
@@ -23,6 +24,19 @@ try {
     $stmt_ime->execute([$user_id]);
     $uporabnik_data = $stmt_ime->fetch();
     $ime_priimek = $uporabnik_data ? $uporabnik_data['ime'] . ' ' . $uporabnik_data['priimek'] : 'Neznan uporabnik';
+
+    // 1.5. Pridobitev vseh predmetov, ki so dodeljeni učitelju iz tabele ucitelj_predmet
+    // This ensures teachers can see all their assigned subjects, even if they don't have students yet
+    $sql_predmeti_ucitelj = "
+        SELECT p.id_predmet, p.ime_predmeta
+        FROM ucitelj_predmet up
+        JOIN predmet p ON up.id_predmet = p.id_predmet
+        WHERE up.id_ucitelj = ?
+        ORDER BY p.ime_predmeta ASC
+    ";
+    $stmt_predmeti_ucitelj = $pdo->prepare($sql_predmeti_ucitelj);
+    $stmt_predmeti_ucitelj->execute([$user_id]);
+    $predmeti_menu = $stmt_predmeti_ucitelj->fetchAll();
 
     // 2. Pridobitev učencev, ki so dodeljeni učitelju (po predmetih)
     $sql_ucenci = "
@@ -438,8 +452,29 @@ try {
 
 <header>
     <div class="logo">E-Učilnica</div>
-    <nav>
+    <nav style="display:flex;gap:12px;align-items:center;">
+        <?php
+            // Get current user profile picture
+            $pic = '';
+            try {
+                $stmt_pic = $pdo->prepare("SELECT icona_profila FROM uporabnik WHERE id_uporabnik = ?");
+                $stmt_pic->execute([$user_id]);
+                $pic = $stmt_pic->fetchColumn();
+            } catch (\Exception $e) { $pic = ''; }
+        ?>
+        <?php if (!empty($pic) && file_exists(__DIR__ . DIRECTORY_SEPARATOR . $pic)): ?>
+            <a href="ucitelj_profile.php" style="display:flex;align-items:center;text-decoration:none;">
+                <img src="<?php echo htmlspecialchars($pic); ?>" alt="Profil" style="width:36px;height:36px;border-radius:50%;object-fit:cover;border:2px solid #fff;margin-right:8px;">
+            </a>
+        <?php else: ?>
+            <a href="ucitelj_profile.php" style="display:flex;align-items:center;text-decoration:none;">
+                <div style="width:36px;height:36px;border-radius:50%;background:#596235;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;margin-right:8px;">
+                    <?php echo strtoupper(substr($ime_priimek,0,1)); ?>
+                </div>
+            </a>
+        <?php endif; ?>
         <span>Pozdravljen, <?= htmlspecialchars($ime_priimek) ?> (<?= $vloga === 'admin' ? 'Administrator' : 'Učitelj' ?>)</span>
+        <a href="ucitelj_profile.php">Moj profil</a>
         <a href="logout.php">Odjava</a>
     </nav>
 </header>
@@ -542,8 +577,9 @@ try {
                         <select id="id_predmet" name="id_predmet" required style="width: 100%; padding: 8px; margin-bottom: 10px;">
                             <option value="">-- Izberi predmet --</option>
                             <?php 
-                            foreach (array_values($ucenci_po_predmetih) as $predmet_data) {
-                                echo '<option value="' . htmlspecialchars($predmet_data['id_predmet']) . '">' . htmlspecialchars($predmet_data['ime_predmeta']) . '</option>';
+                            // Use predmeti_menu which contains all subjects assigned to teacher from ucitelj_predmet table
+                            foreach ($predmeti_menu as $predmet) {
+                                echo '<option value="' . htmlspecialchars($predmet['id_predmet']) . '">' . htmlspecialchars($predmet['ime_predmeta']) . '</option>';
                             }
                             ?>
                         </select>

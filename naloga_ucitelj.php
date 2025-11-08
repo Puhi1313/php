@@ -3,22 +3,22 @@
 // $seznam_nalog je array vseh nalog, $naloga je trenutno izbrana (ali zadnja) naloga
 
 // Pridobivanje podatkov o oddajah, če obstaja aktivna naloga
-$ucenci_za_prikaz = [];
+$ucenci_za_prikaz = []; // Structure: [id_ucenec => ['ucenec' => [...], 'oddaje' => [...]]]
 if (!empty($naloga)) {
-    // Pridobitev vseh oddaj za to nalogo
     try {
+        // Pridobitev VSEH oddaj za to nalogo (not just latest), ordered by date DESC
         $sql_oddaje = "
             SELECT o.*, u.ime, u.priimek
             FROM oddaja o
             JOIN uporabnik u ON o.id_ucenec = u.id_uporabnik
             WHERE o.id_naloga = ?
-            ORDER BY u.priimek ASC
+            ORDER BY o.id_ucenec ASC, o.datum_oddaje DESC
         ";
         $stmt_oddaje = $pdo->prepare($sql_oddaje);
         $stmt_oddaje->execute([$naloga['id_naloga']]);
-        $oddaje = $stmt_oddaje->fetchAll();
+        $vse_oddaje = $stmt_oddaje->fetchAll();
 
-        // Pridobitev vseh učencev za ta predmet za status 'Ni oddano'
+        // Pridobitev vseh učencev za ta predmet
         $sql_vsi_ucenci = "
             SELECT up.id_uporabnik, up.ime, up.priimek
             FROM ucenec_predmet ucp
@@ -28,31 +28,47 @@ if (!empty($naloga)) {
         ";
         $stmt_vsi_ucenci = $pdo->prepare($sql_vsi_ucenci);
         $stmt_vsi_ucenci->execute([$id_predmet, $id_ucitelja]);
-        $vsi_ucenci = $stmt_vsi_ucenci->fetchAll(PDO::FETCH_GROUP|PDO::FETCH_UNIQUE);
+        $vsi_ucenci = $stmt_vsi_ucenci->fetchAll();
 
-        // Združite podatke: ustvarite seznam vseh učencev s statusom oddaje
-        $oddaje_map = [];
-        foreach ($oddaje as $oddaja) {
-            $oddaje_map[$oddaja['id_ucenec']] = $oddaja;
+        // Organize submissions by student
+        $oddaje_po_ucencih = [];
+        foreach ($vse_oddaje as $oddaja) {
+            $id_ucenec = $oddaja['id_ucenec'];
+            if (!isset($oddaje_po_ucencih[$id_ucenec])) {
+                $oddaje_po_ucencih[$id_ucenec] = [];
+            }
+            $oddaje_po_ucencih[$id_ucenec][] = $oddaja;
         }
 
-        foreach ($vsi_ucenci as $id => $ucenec) {
-            $oddaja_status = isset($oddaje_map[$id]) ? $oddaje_map[$id] : [
-                'id_uporabnik' => $id,
+        // Create structure for display: each student with all their submissions
+        foreach ($vsi_ucenci as $ucenec) {
+            $id_ucenec = $ucenec['id_uporabnik'];
+            $oddaje_ucenca = $oddaje_po_ucencih[$id_ucenec] ?? [];
+            
+            // Find active submission (latest non-'Zamenjana' status, or latest if all are 'Zamenjana')
+            $aktivna_oddaja = null;
+            if (!empty($oddaje_ucenca)) {
+                foreach ($oddaje_ucenca as $oddaja) {
+                    if ($oddaja['status'] !== 'Zamenjana') {
+                        $aktivna_oddaja = $oddaja;
+                        break;
+                    }
+                }
+                // If all are 'Zamenjana', use the latest one
+                if (!$aktivna_oddaja) {
+                    $aktivna_oddaja = $oddaje_ucenca[0];
+                }
+            }
+            
+            $ucenci_za_prikaz[] = [
+                'id_uporabnik' => $id_ucenec,
                 'ime' => $ucenec['ime'],
                 'priimek' => $ucenec['priimek'],
-                'status' => 'Ni oddano',
-                'datum_oddaje' => null,
-                'ocena' => null,
-                'id_oddaja' => null
+                'oddaje' => $oddaje_ucenca, // All submissions
+                'aktivna_oddaja' => $aktivna_oddaja, // Current active submission
+                'ima_oddaje' => !empty($oddaje_ucenca)
             ];
-            $ucenci_za_prikaz[] = $oddaja_status;
         }
-        
-        // Ponovno sortiraj po priimku, ker je PDO::FETCH_GROUP spremenil vrstni red
-        usort($ucenci_za_prikaz, function($a, $b) {
-            return strcmp($a['priimek'], $b['priimek']);
-        });
 
     } catch (\PDOException $e) {
         echo "<p style='color: red;'>Napaka pri bazi: " . $e->getMessage() . "</p>";
@@ -103,12 +119,79 @@ if (!empty($naloga)) {
     </div>
 
 
-    <h3 style="margin-top: 30px;">Prejemniki (Skupaj: <?php echo count($ucenci_za_prikaz); ?>)</h3>
-    <ul style="margin: 0; padding-left: 20px;">
-        <?php foreach ($ucenci_za_prikaz as $podatki): ?>
-            <li><?php echo htmlspecialchars($podatki['ime'] . ' ' . $podatki['priimek']); ?></li>
+    <h3 style="margin-top: 30px;">Oddaje Učencev (Skupaj: <?php echo count($ucenci_za_prikaz); ?>)</h3>
+    
+    <div style="margin-top: 20px;">
+        <?php foreach ($ucenci_za_prikaz as $ucenec_data): ?>
+            <div style="margin-bottom: 25px; padding: 15px; border: 2px solid #ddd; border-radius: 8px; background: #f9f9f9;">
+                <h4 style="margin: 0 0 10px 0; color: #3f51b5;">
+                    <?php echo htmlspecialchars($ucenec_data['ime'] . ' ' . $ucenec_data['priimek']); ?>
+                </h4>
+                
+                <?php if ($ucenec_data['ima_oddaje']): ?>
+                    <?php 
+                    $oddaje = $ucenec_data['oddaje'];
+                    $aktivna = $ucenec_data['aktivna_oddaja'];
+                    ?>
+                    
+                    <div style="margin-top: 10px;">
+                        <strong style="color: #28a745;">Aktivna oddaja:</strong>
+                        <?php if ($aktivna): ?>
+                            <div style="margin-left: 20px; margin-top: 5px; padding: 10px; background: #e8f5e9; border-left: 4px solid #28a745;">
+                                <p style="margin: 5px 0;"><strong>Status:</strong> <?php echo htmlspecialchars($aktivna['status']); ?></p>
+                                <p style="margin: 5px 0;"><strong>Datum oddaje:</strong> <?php echo date('d.m.Y H:i', strtotime($aktivna['datum_oddaje'])); ?></p>
+                                <?php if ($aktivna['ocena']): ?>
+                                    <p style="margin: 5px 0;"><strong>Ocena:</strong> <?php echo htmlspecialchars($aktivna['ocena']); ?></p>
+                                <?php endif; ?>
+                                <?php if ($aktivna['podaljsan_rok']): ?>
+                                    <p style="margin: 5px 0;"><strong>Podaljšan rok:</strong> <?php echo date('d.m.Y H:i', strtotime($aktivna['podaljsan_rok'])); ?></p>
+                                <?php endif; ?>
+                                <button 
+                                    data-oddaja-id="<?php echo $aktivna['id_oddaja']; ?>" 
+                                    data-ucenec-ime="<?php echo htmlspecialchars($ucenec_data['ime'] . ' ' . $ucenec_data['priimek']); ?>" 
+                                    class="pregled-oddaje-btn"
+                                    style="background: #1c4587; color: white; border: none; padding: 5px 10px; cursor: pointer; margin-top: 10px;">
+                                    Pregled/Oceni
+                                </button>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                    
+                    <?php if (count($oddaje) > 1): ?>
+                        <div style="margin-top: 15px;">
+                            <strong style="color: #666;">Zgodovina oddaj (<?php echo count($oddaje); ?>):</strong>
+                            <div style="margin-left: 20px; margin-top: 5px;">
+                                <?php foreach ($oddaje as $index => $oddaja): ?>
+                                    <div style="margin-bottom: 10px; padding: 8px; background: <?php echo $oddaja['id_oddaja'] == $aktivna['id_oddaja'] ? '#e8f5e9' : '#fff'; ?>; border-left: 3px solid <?php echo $oddaja['status'] === 'Zamenjana' ? '#999' : ($oddaja['id_oddaja'] == $aktivna['id_oddaja'] ? '#28a745' : '#ccc'); ?>;">
+                                        <p style="margin: 3px 0; font-size: 0.9em;">
+                                            <strong>#<?php echo count($oddaje) - $index; ?>:</strong> 
+                                            <?php echo date('d.m.Y H:i', strtotime($oddaja['datum_oddaje'])); ?> | 
+                                            Status: <strong><?php echo htmlspecialchars($oddaja['status']); ?></strong>
+                                            <?php if ($oddaja['ocena']): ?>
+                                                | Ocena: <strong><?php echo htmlspecialchars($oddaja['ocena']); ?></strong>
+                                            <?php endif; ?>
+                                            <?php if ($oddaja['id_oddaja'] == $aktivna['id_oddaja']): ?>
+                                                <span style="color: #28a745; font-weight: bold;">(AKTIVNA)</span>
+                                            <?php endif; ?>
+                                        </p>
+                                        <button 
+                                            data-oddaja-id="<?php echo $oddaja['id_oddaja']; ?>" 
+                                            data-ucenec-ime="<?php echo htmlspecialchars($ucenec_data['ime'] . ' ' . $ucenec_data['priimek']); ?>" 
+                                            class="pregled-oddaje-btn"
+                                            style="background: #666; color: white; border: none; padding: 3px 8px; cursor: pointer; font-size: 0.85em;">
+                                            Pregled
+                                        </button>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+                        </div>
+                    <?php endif; ?>
+                <?php else: ?>
+                    <p style="color: #999; font-style: italic;">Ni oddano</p>
+                <?php endif; ?>
+            </div>
         <?php endforeach; ?>
-    </ul>
+    </div>
 
 <?php else: ?>
 

@@ -16,9 +16,10 @@ if (empty($id_oddaja)) {
 }
 
 try {
+    // Get the specific submission
     $sql = "
         SELECT o.*, ucenec.ime AS ucenec_ime, ucenec.priimek AS ucenec_priimek, 
-               naloga.naslov AS naloga_naslov, naloga.rok_oddaje
+               naloga.naslov AS naloga_naslov, naloga.rok_oddaje, naloga.id_naloga
         FROM oddaja o
         JOIN uporabnik ucenec ON o.id_ucenec = ucenec.id_uporabnik
         JOIN naloga ON o.id_naloga = naloga.id_naloga
@@ -31,6 +32,38 @@ try {
     if (!$oddaja) {
         die("Oddaja ni najdena.");
     }
+    
+    // Get all submissions for this task and student (submission history)
+    $sql_history = "
+        SELECT id_oddaja, datum_oddaje, status, ocena
+        FROM oddaja
+        WHERE id_naloga = ? AND id_ucenec = ?
+        ORDER BY datum_oddaje DESC
+    ";
+    $stmt_history = $pdo->prepare($sql_history);
+    $stmt_history->execute([$oddaja['id_naloga'], $oddaja['id_ucenec']]);
+    $submission_history = $stmt_history->fetchAll();
+    
+    // Check if this is the active submission (not 'Zamenjana' or latest if all are 'Zamenjana')
+    $is_active = false;
+    if (!empty($submission_history)) {
+        // Check if there's a non-'Zamenjana' submission
+        $has_active = false;
+        foreach ($submission_history as $sub) {
+            if ($sub['status'] !== 'Zamenjana') {
+                $has_active = true;
+                if ($sub['id_oddaja'] == $id_oddaja) {
+                    $is_active = true;
+                }
+                break;
+            }
+        }
+        // If all are 'Zamenjana', the latest one is considered active
+        if (!$has_active && $submission_history[0]['id_oddaja'] == $id_oddaja) {
+            $is_active = true;
+        }
+    }
+    
 } catch (\PDOException $e) {
     die("Napaka pri bazi: " . $e->getMessage());
 }
@@ -40,7 +73,32 @@ try {
     <h4>Oddaja učenca: **<?php echo htmlspecialchars($oddaja['ucenec_ime'] . ' ' . $oddaja['ucenec_priimek']); ?>**</h4>
     <p>Naloga: <?php echo htmlspecialchars($oddaja['naloga_naslov']); ?></p>
     <p>Rok oddaje: <?php echo date('d.m.Y H:i', strtotime($oddaja['rok_oddaje'])); ?></p>
+    <?php if (!empty($oddaja['podaljsan_rok'])): ?>
+        <p><strong style="color: #d4a574;">Podaljšan rok:</strong> <?php echo date('d.m.Y H:i', strtotime($oddaja['podaljsan_rok'])); ?></p>
+    <?php endif; ?>
     <p>Oddano: **<?php echo date('d.m.Y H:i', strtotime($oddaja['datum_oddaje'])); ?>**</p>
+    <p><strong>Status:</strong> <?php echo htmlspecialchars($oddaja['status']); ?> <?php if ($is_active): ?><span style="color: #28a745; font-weight: bold;">(AKTIVNA)</span><?php endif; ?></p>
+    
+    <?php if (count($submission_history) > 1): ?>
+        <div style="margin-top: 15px; padding: 10px; background: #f0f0f0; border-radius: 5px;">
+            <strong>Zgodovina oddaj (<?php echo count($submission_history); ?>):</strong>
+            <ul style="margin: 5px 0; padding-left: 20px;">
+                <?php foreach ($submission_history as $index => $sub): ?>
+                    <li style="margin: 5px 0;">
+                        #<?php echo count($submission_history) - $index; ?>: 
+                        <?php echo date('d.m.Y H:i', strtotime($sub['datum_oddaje'])); ?> | 
+                        Status: <strong><?php echo htmlspecialchars($sub['status']); ?></strong>
+                        <?php if ($sub['ocena']): ?>
+                            | Ocena: <strong><?php echo htmlspecialchars($sub['ocena']); ?></strong>
+                        <?php endif; ?>
+                        <?php if ($sub['id_oddaja'] == $id_oddaja): ?>
+                            <span style="color: #007bff; font-weight: bold;">(Trenutno prikazano)</span>
+                        <?php endif; ?>
+                    </li>
+                <?php endforeach; ?>
+            </ul>
+        </div>
+    <?php endif; ?>
     
     <hr>
     
