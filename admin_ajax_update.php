@@ -28,6 +28,12 @@ if (empty($id_uporabnik) || empty($ime) || empty($priimek) || empty($email) || e
     exit;
 }
 
+// NOVO PREVERJANJE: Če je geslo vneseno, mora imeti vsaj 12 znakov
+if (!empty($novo_geslo) && strlen($novo_geslo) < 12) {
+    echo json_encode(['success' => false, 'message' => 'Geslo mora vsebovati vsaj 12 znakov.']);
+    exit;
+}
+
 // 4. PRIPRAVA POSODOBITVE
 $sql = "UPDATE uporabnik SET ime = ?, priimek = ?, email = ?, vloga = ?, status = ?, prvi_vpis = ?";
 $params = [$ime, $priimek, $email, $vloga, $status, $prvi_vpis];

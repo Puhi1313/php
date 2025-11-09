@@ -27,8 +27,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error_message = "Vsa polja so obvezna!";
     } elseif ($geslo !== $geslo_ponovno) {
         $error_message = "Gesli se ne ujemata.";
-    } elseif (strlen($geslo) < 6) {
-        $error_message = "Geslo mora imeti vsaj 6 znakov.";
+    } elseif (strlen($geslo) < 12) {
+        $error_message = "Geslo mora imeti vsaj 12 znakov.";
     } else {
         
         // --- LOGIKA ZA GENERIRANJE ŠOLSKEGA E-MAILA ---

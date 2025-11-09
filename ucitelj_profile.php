@@ -32,7 +32,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($new_password !== '' || $confirm_password !== '') {
         if ($new_password !== $confirm_password) {
             $error = 'Novo geslo in potrditev se ne ujemata.';
-        } else {
+        } 
+        // DODAN PREVERJANJE DOLŽINE
+        else if (strlen($new_password) < 12) {
+            $error = 'Novo geslo mora imeti vsaj 12 znakov.';
+        } 
+        // KONEC DODATNEGA PREVERJANJA
+        else {
             if (empty($current_password)) {
                 $error = 'Za menjavo gesla vnesite trenutno geslo.';
             } else {

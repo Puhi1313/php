@@ -311,7 +311,7 @@ $admin_priimek = $_SESSION['priimek'] ?? 'Uporabnik';
                 </select>
             </div>
             <div class="form-group">
-                <label for="edit_prvi_vpis">Zahtevaj spremembo gesla ob 1. vpisu:</label>
+                <label for="edit_prvi_vpis">Prvi vpis:</label>
                 <select id="edit_prvi_vpis" name="prvi_vpis" required>
                     <option value="1">DA</option>
                     <option value="0">NE</option>

@@ -1,5 +1,5 @@
 <?php
-$testno_geslo = 'test'; // Geslo, s katerim se boste prijavili
+$testno_geslo = 'geslozaadmin'; // Geslo, s katerim se boste prijavili
 $hash = password_hash($testno_geslo, PASSWORD_DEFAULT);
 
 echo "Geslo, ki ga vnašate: " . $testno_geslo . "<br>";
