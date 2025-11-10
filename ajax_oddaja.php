@@ -39,21 +39,8 @@ try {
     $rok_oddaje = new DateTime($naloga_data['rok_oddaje']);
     $danes = new DateTime();
     
-    // 2. Check for failing submission with active podaljsan_rok (CRITICAL: check ANY failing submission, not just latest)
-    $sql_failing = "SELECT id_oddaja, pot_na_strezniku, status, ocena, podaljsan_rok 
-                    FROM oddaja 
-                    WHERE id_naloga = ? AND id_ucenec = ? 
-                    AND ocena = '1' 
-                    AND podaljsan_rok IS NOT NULL 
-                    AND podaljsan_rok > NOW()
-                    AND status = 'Dopolnitev'
-                    ORDER BY datum_oddaje DESC LIMIT 1";
-    $stmt_failing = $pdo->prepare($sql_failing);
-    $stmt_failing->execute([$id_naloga, $user_id]);
-    $failing_submission = $stmt_failing->fetch();
-    
-    // 3. Get latest submission (for checking if already submitted and waiting for grade)
-    $sql_latest = "SELECT id_oddaja, pot_na_strezniku, status, ocena, podaljsan_rok 
+    // 2. Get latest submission (for checking if already submitted and waiting for grade)
+    $sql_latest = "SELECT id_oddaja, pot_na_strezniku, status, ocena, podaljsan_rok, datum_oddaje
                    FROM oddaja 
                    WHERE id_naloga = ? AND id_ucenec = ? 
                    ORDER BY id_oddaja DESC LIMIT 1";
@@ -61,21 +48,38 @@ try {
     $stmt_latest->execute([$id_naloga, $user_id]);
     $latest_submission = $stmt_latest->fetch();
     
+    // 3. Check for ANY submission with ocena = '1' (regardless of status or podaljsan_rok)
+    $sql_failing = "SELECT id_oddaja, pot_na_strezniku, status, ocena, podaljsan_rok, datum_oddaje
+                    FROM oddaja 
+                    WHERE id_naloga = ? AND id_ucenec = ? 
+                    AND ocena = '1'
+                    ORDER BY datum_oddaje DESC LIMIT 1";
+    $stmt_failing = $pdo->prepare($sql_failing);
+    $stmt_failing->execute([$id_naloga, $user_id]);
+    $failing_submission = $stmt_failing->fetch();
+    
     $previous_oddaja_id = null;
     $ze_oddano = false;
     $rok_za_preverjanje = $rok_oddaje;
     
-    // CRITICAL: If there's a failing submission with active podaljsan_rok, allow re-submission
+    // CRITICAL: If there's ANY submission with ocena = '1', allow re-submission
     if ($failing_submission) {
         $allow_re_submission = true;
         $ze_oddano = true;
         $previous_oddaja_id = $failing_submission['id_oddaja'];
-        $rok_za_preverjanje = new DateTime($failing_submission['podaljsan_rok']);
         
-        // Check if extended deadline has passed
-        if ($danes > $rok_za_preverjanje) {
-            echo json_encode(["success" => false, "message" => "Rok za dopolnitev je potekel."]);
-            exit;
+        // Check podaljsan_rok if it exists
+        if (!empty($failing_submission['podaljsan_rok'])) {
+            $rok_za_preverjanje = new DateTime($failing_submission['podaljsan_rok']);
+            // Check if extended deadline has passed
+            if ($danes > $rok_za_preverjanje) {
+                // Even if podaljsan_rok expired, still allow resubmission (no deadline restriction for ocena=1)
+                // But use original deadline for display purposes
+                $rok_za_preverjanje = $rok_oddaje;
+            }
+        } else {
+            // No podaljsan_rok - allow resubmission without deadline restriction
+            $rok_za_preverjanje = $rok_oddaje;
         }
     } elseif ($latest_submission) {
         $ze_oddano = true;
@@ -111,9 +115,19 @@ try {
     }
     
     // 4. Final deadline check (for new submissions or non-failing re-submissions)
+    // CRITICAL: Don't block resubmissions for tasks with ocena=1 (allow_re_submission is true)
     if (!$allow_re_submission && $danes > $rok_za_preverjanje) {
         echo json_encode(["success" => false, "message" => "Rok za oddajo je potekel."]);
         exit;
+    }
+    
+    // For tasks with ocena=1, if podaljsan_rok exists and is still valid, use it; otherwise allow anyway
+    if ($allow_re_submission && $failing_submission && !empty($failing_submission['podaljsan_rok'])) {
+        $podaljsan_rok_dt = new DateTime($failing_submission['podaljsan_rok']);
+        if ($danes <= $podaljsan_rok_dt) {
+            $rok_za_preverjanje = $podaljsan_rok_dt;
+        }
+        // If podaljsan_rok expired, still allow resubmission (no deadline restriction for ocena=1)
     }
     
     // 5. Obdelava datoteke

@@ -46,7 +46,7 @@ try {
     $filter_order = isset($_GET['order']) ? $_GET['order'] : 'newest'; // 'newest' or 'oldest'
 
     // 3. Pridobitev vseh nalog za te predmete (z možnostjo filtriranja)
-    // CRITICAL: First check for failing tasks (ocena=1 with active podaljsan_rok), then get latest submission
+    // CRITICAL: Check for ALL tasks with ocena=1 (not just those with active podaljsan_rok)
     $sql_naloge = "
         SELECT 
             n.id_naloga, n.naslov, n.opis_naloge, n.rok_oddaje, n.datum_objave, n.id_predmet, n.id_ucitelj, n.pot_na_strezniku AS naloga_datoteka,
@@ -55,20 +55,17 @@ try {
             -- Latest submission data (for non-failing tasks)
             o_latest.id_oddaja, o_latest.datum_oddaje, o_latest.besedilo_oddaje, o_latest.pot_na_strezniku AS oddaja_datoteka, 
             o_latest.status, o_latest.ocena, o_latest.komentar_ucitelj, o_latest.podaljsan_rok,
-            -- Check for failing task: any submission with ocena=1 and podaljsan_rok in future
+            -- Check for failing task: ANY submission with ocena=1 (regardless of podaljsan_rok or status)
             CASE 
                 WHEN EXISTS (
                     SELECT 1 FROM oddaja o_fail 
                     WHERE o_fail.id_naloga = n.id_naloga 
                     AND o_fail.id_ucenec = ? 
-                    AND o_fail.ocena = '1' 
-                    AND o_fail.podaljsan_rok IS NOT NULL 
-                    AND o_fail.podaljsan_rok > NOW()
-                    AND o_fail.status = 'Dopolnitev'
+                    AND o_fail.ocena = '1'
                 ) THEN 1 
                 ELSE 0 
             END AS je_negativna_naloga,
-            -- Get ALL data from the failing submission (if exists) - this is what we display for failing tasks
+            -- Get ALL data from the latest submission with ocena=1 (if exists) - this is what we display for failing tasks
             o_fail_data.id_oddaja AS fail_id_oddaja,
             o_fail_data.datum_oddaje AS fail_datum_oddaje,
             o_fail_data.besedilo_oddaje AS fail_besedilo_oddaje,
@@ -94,21 +91,15 @@ try {
                 AND o1.id_ucenec = o2.id_ucenec 
                 AND o1.datum_oddaje = o2.max_datum
         ) o_latest ON n.id_naloga = o_latest.id_naloga AND o_latest.id_ucenec = ?
-        -- Get failing submission data (if exists and active) - latest failing submission per task
+        -- Get latest submission with ocena=1 (if exists) - regardless of podaljsan_rok or status
         LEFT JOIN oddaja o_fail_data ON o_fail_data.id_naloga = n.id_naloga
             AND o_fail_data.id_ucenec = ?
-            AND o_fail_data.ocena = '1' 
-            AND o_fail_data.podaljsan_rok IS NOT NULL 
-            AND o_fail_data.podaljsan_rok > NOW()
-            AND o_fail_data.status = 'Dopolnitev'
+            AND o_fail_data.ocena = '1'
             AND o_fail_data.id_oddaja = (
                 SELECT id_oddaja FROM oddaja o_fail_sub
                 WHERE o_fail_sub.id_naloga = n.id_naloga
                     AND o_fail_sub.id_ucenec = ?
-                    AND o_fail_sub.ocena = '1' 
-                    AND o_fail_sub.podaljsan_rok IS NOT NULL 
-                    AND o_fail_sub.podaljsan_rok > NOW()
-                    AND o_fail_sub.status = 'Dopolnitev'
+                    AND o_fail_sub.ocena = '1'
                 ORDER BY o_fail_sub.datum_oddaje DESC
                 LIMIT 1
             )
@@ -157,17 +148,26 @@ function get_naloga_status($naloga, $is_failing_task = false) {
     $status = $naloga['status'] ?? null;
     $ocena = $naloga['ocena'] ?? null;
 
-    // Failing tasks: ocena=1 with active podaljsan_rok
-    if ($is_failing_task && $ocena == '1' && $podaljsan_rok) {
-        $podaljsan_rok_dt = new DateTime($podaljsan_rok);
-        if ($podaljsan_rok_dt > $danes) {
-            return [
-                'status' => 'Za dopolnitev (Ocena: 1)',
-                'barva' => '#d4a574',
-                'ikona' => '⚠️',
-                'podaljsan_rok' => $podaljsan_rok
-            ];
+    // Failing tasks: ocena=1 (always show as needing resubmission)
+    if ($is_failing_task && $ocena == '1') {
+        if ($podaljsan_rok) {
+            $podaljsan_rok_dt = new DateTime($podaljsan_rok);
+            if ($podaljsan_rok_dt > $danes) {
+                return [
+                    'status' => 'Za dopolnitev (Ocena: 1)',
+                    'barva' => '#d4a574',
+                    'ikona' => '⚠️',
+                    'podaljsan_rok' => $podaljsan_rok
+                ];
+            }
         }
+        // Even without podaljsan_rok or if it expired, show as needing resubmission
+        return [
+            'status' => 'Nezadostno (Ocena: 1)',
+            'barva' => '#d4a574',
+            'ikona' => '⚠️',
+            'podaljsan_rok' => $podaljsan_rok
+        ];
     }
 
     // Check submission status
@@ -223,30 +223,56 @@ foreach ($vse_naloge_ucenec as $naloga) {
     $danes = new DateTime();
     $je_negativna = $naloga['je_negativna_naloga'] == 1;
     
-    // STEP 1: Handle FAILING TASKS first (highest priority)
-    if ($je_negativna && !empty($naloga['fail_id_oddaja'])) {
-        // Use data from failing submission
-        $naloga_normalized = [
-            'id_naloga' => $naloga['id_naloga'],
-            'naslov' => $naloga['naslov'],
-            'opis_naloge' => $naloga['opis_naloge'],
-            'rok_oddaje' => $naloga['rok_oddaje'],
-            'datum_objave' => $naloga['datum_objave'],
-            'id_predmet' => $naloga['id_predmet'],
-            'id_ucitelj' => $naloga['id_ucitelj'],
-            'naloga_datoteka' => $naloga['naloga_datoteka'],
-            'ime_predmeta' => $naloga['ime_predmeta'],
-            'ime_ucitelja' => $naloga['ime_ucitelja'],
-            'priimek_ucitelja' => $naloga['priimek_ucitelja'],
-            'id_oddaja' => $naloga['fail_id_oddaja'],
-            'datum_oddaje' => $naloga['fail_datum_oddaje'],
-            'besedilo_oddaje' => $naloga['fail_besedilo_oddaje'],
-            'oddaja_datoteka' => $naloga['fail_oddaja_datoteka'],
-            'status' => $naloga['fail_status'],
-            'ocena' => $naloga['fail_ocena'],
-            'komentar_ucitelj' => $naloga['fail_komentar_ucitelj'],
-            'podaljsan_rok' => $naloga['fail_podaljsan_rok']
-        ];
+    // STEP 1: Handle FAILING TASKS first (highest priority) - ALL tasks with ocena=1
+    if ($je_negativna) {
+        // Use data from failing submission if available, otherwise use latest submission
+        if (!empty($naloga['fail_id_oddaja'])) {
+            // Use data from the submission with ocena=1
+            $naloga_normalized = [
+                'id_naloga' => $naloga['id_naloga'],
+                'naslov' => $naloga['naslov'],
+                'opis_naloge' => $naloga['opis_naloge'],
+                'rok_oddaje' => $naloga['rok_oddaje'],
+                'datum_objave' => $naloga['datum_objave'],
+                'id_predmet' => $naloga['id_predmet'],
+                'id_ucitelj' => $naloga['id_ucitelj'],
+                'naloga_datoteka' => $naloga['naloga_datoteka'],
+                'ime_predmeta' => $naloga['ime_predmeta'],
+                'ime_ucitelja' => $naloga['ime_ucitelja'],
+                'priimek_ucitelja' => $naloga['priimek_ucitelja'],
+                'id_oddaja' => $naloga['fail_id_oddaja'],
+                'datum_oddaje' => $naloga['fail_datum_oddaje'],
+                'besedilo_oddaje' => $naloga['fail_besedilo_oddaje'],
+                'oddaja_datoteka' => $naloga['fail_oddaja_datoteka'],
+                'status' => $naloga['fail_status'],
+                'ocena' => $naloga['fail_ocena'],
+                'komentar_ucitelj' => $naloga['fail_komentar_ucitelj'],
+                'podaljsan_rok' => $naloga['fail_podaljsan_rok']
+            ];
+        } else {
+            // Fallback: use latest submission data (should have ocena=1)
+            $naloga_normalized = [
+                'id_naloga' => $naloga['id_naloga'],
+                'naslov' => $naloga['naslov'],
+                'opis_naloge' => $naloga['opis_naloge'],
+                'rok_oddaje' => $naloga['rok_oddaje'],
+                'datum_objave' => $naloga['datum_objave'],
+                'id_predmet' => $naloga['id_predmet'],
+                'id_ucitelj' => $naloga['id_ucitelj'],
+                'naloga_datoteka' => $naloga['naloga_datoteka'],
+                'ime_predmeta' => $naloga['ime_predmeta'],
+                'ime_ucitelja' => $naloga['ime_ucitelja'],
+                'priimek_ucitelja' => $naloga['priimek_ucitelja'],
+                'id_oddaja' => $naloga['id_oddaja'],
+                'datum_oddaje' => $naloga['datum_oddaje'],
+                'besedilo_oddaje' => $naloga['besedilo_oddaje'],
+                'oddaja_datoteka' => $naloga['oddaja_datoteka'],
+                'status' => $naloga['status'],
+                'ocena' => $naloga['ocena'],
+                'komentar_ucitelj' => $naloga['komentar_ucitelj'],
+                'podaljsan_rok' => $naloga['podaljsan_rok']
+            ];
+        }
         
         $status_data = get_naloga_status($naloga_normalized, true);
         $naloga_normalized['status_info'] = $status_data;
@@ -295,7 +321,7 @@ foreach ($vse_naloge_ucenec as $naloga) {
         $naloge_oddano[] = $naloga_normalized;
     } elseif (strpos($status_str, 'Ocenjeno') !== false) {
         // Only add to ocenjeno if it's a final grade (not failing)
-        // Failing tasks (ocena=1 with active podaljsan_rok) should have been caught above
+        // Failing tasks (ocena=1) should have been caught above
         $naloge_ocenjeno[] = $naloga_normalized;
     } else {
         // Nova naloga, Za dopolnitev (non-failing), Pretečen rok
@@ -991,23 +1017,53 @@ foreach ($vse_naloge_ucenec as $naloga) {
                 const submitBtn = oddajaForm.querySelector('button[type="submit"]');
                 const podaljsanRok = this.dataset.podaljsanRok || '';
                 
-                if (statusOddaje === 'Oddano' || statusOddaje === 'Zamenjana') {
-                    // Čaka na oceno - onemogoči oddajo in spremeni naslov
-                    submitBtn.disabled = true;
-                    submitBtn.textContent = statusOddaje === 'Zamenjana' ? 'Zamenjana (Čaka na oceno)' : 'Oddano (Čaka na oceno)';
-                    formHeader.textContent = 'Oddana rešitev:';
-                } else if (statusOddaje === 'Dopolnitev' && (ocena == '1' || ocena === 'ND')) {
-                    // Failing task (grade 1 or ND) with status 'Dopolnitev' - check podaljsan_rok
-                    let canResubmit = false;
+                // CRITICAL: Allow resubmission for ALL tasks with ocena = '1' (regardless of status)
+                if (ocena == '1') {
+                    // Task with grade 1 - allow resubmission
+                    let canResubmit = true;
+                    let deadlineText = '';
+                    
                     if (podaljsanRok) {
-                        // Parse podaljsan_rok (format: d.m.Y H:i)
+                        // Check if podaljsan_rok is still valid
                         const rokParts = podaljsanRok.split(' ');
                         const dateParts = rokParts[0].split('.');
                         const timeParts = rokParts[1] ? rokParts[1].split(':') : ['00', '00'];
                         const rokDate = new Date(dateParts[2], dateParts[1] - 1, dateParts[0], timeParts[0], timeParts[1]);
                         const now = new Date();
                         canResubmit = now <= rokDate;
-                    } else if (ocena === 'ND') {
+                        deadlineText = ' (Rok: ' + podaljsanRok + ')';
+                    } else {
+                        // No podaljsan_rok - allow resubmission (no deadline restriction)
+                        canResubmit = true;
+                    }
+                    
+                    if (canResubmit) {
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = 'Dopolni nalogo';
+                        formHeader.textContent = 'Dopolni nalogo (Ocena: 1):' + deadlineText;
+                    } else {
+                        submitBtn.disabled = true;
+                        submitBtn.textContent = 'Rok za dopolnitev potekel';
+                        formHeader.textContent = 'Oddana rešitev:';
+                    }
+                    
+                    ocenaInfo.style.display = 'block';
+                } else if (statusOddaje === 'Oddano' || statusOddaje === 'Zamenjana') {
+                    // Čaka na oceno - onemogoči oddajo in spremeni naslov
+                    submitBtn.disabled = true;
+                    submitBtn.textContent = statusOddaje === 'Zamenjana' ? 'Zamenjana (Čaka na oceno)' : 'Oddano (Čaka na oceno)';
+                    formHeader.textContent = 'Oddana rešitev:';
+                } else if (statusOddaje === 'Dopolnitev' && ocena === 'ND') {
+                    // ND grade with status 'Dopolnitev' - check podaljsan_rok
+                    let canResubmit = false;
+                    if (podaljsanRok) {
+                        const rokParts = podaljsanRok.split(' ');
+                        const dateParts = rokParts[0].split('.');
+                        const timeParts = rokParts[1] ? rokParts[1].split(':') : ['00', '00'];
+                        const rokDate = new Date(dateParts[2], dateParts[1] - 1, dateParts[0], timeParts[0], timeParts[1]);
+                        const now = new Date();
+                        canResubmit = now <= rokDate;
+                    } else {
                         // ND without podaljsan_rok - allow resubmission within 7 days of grading
                         if (oddajaDatum) {
                             const dt = new Date(oddajaDatum.replace(/\./g,'-').replace(/ /,'T'));
