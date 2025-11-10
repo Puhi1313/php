@@ -667,7 +667,7 @@ foreach ($vse_naloge_ucenec as $naloga) {
 
         <div class="tab-buttons">
             <button class="tab-button active" data-tab="nova-naloga">Neoddane / Za dopolnitev (<?php echo count($naloge_nova); ?>)</button>
-            <button class="tab-button" data-tab="negativne-naloge">Negativne Naloge (<?php echo count($naloge_negativne); ?>)</button>
+            <button class="tab-button" data-tab="nezadostno">Nezadostno (<?php echo count($naloge_negativne); ?>)</button>
             <button class="tab-button" data-tab="oddano-caka-oceno">Oddane (<?php echo count($naloge_oddano); ?>)</button>
             <button class="tab-button" data-tab="ocenjeno">Ocenjene (<?php echo count($naloge_ocenjeno); ?>)</button>
         </div>
@@ -712,7 +712,7 @@ foreach ($vse_naloge_ucenec as $naloga) {
             <?php endif; ?>
         </div>
 
-        <div id="negativne-naloge" class="tab-content">
+        <div id="nezadostno" class="tab-content">
             <?php if (empty($naloge_negativne)): ?>
                 <p>Odlično! Nimate negativnih nalog za dopolnitev.</p>
             <?php else: ?>

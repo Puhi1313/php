@@ -167,15 +167,16 @@ try {
             $stmt_update_previous = $pdo->prepare($sql_update_previous);
             $stmt_update_previous->execute([$id_naloga, $user_id]);
             
-            // INSERT new submission (do not include ocena or podaljsan_rok - these are set by teacher)
-            $sql_insert = "INSERT INTO oddaja (id_naloga, id_ucenec, besedilo_oddaje, pot_na_strezniku, status) 
-                           VALUES (?, ?, ?, ?, 'Oddano')";
+            // INSERT new submission - explicitly set ocena and komentar_ucitelj to NULL for re-grading
+            // This flags the task for re-grading after resubmission
+            $sql_insert = "INSERT INTO oddaja (id_naloga, id_ucenec, besedilo_oddaje, pot_na_strezniku, status, ocena, komentar_ucitelj) 
+                           VALUES (?, ?, ?, ?, 'Oddano', NULL, NULL)";
             $stmt_oddaja = $pdo->prepare($sql_insert);
             $stmt_oddaja->execute([$id_naloga, $user_id, $besedilo_oddaje, $pot_na_strezniku]);
             $sporocilo = "Dopolnitev uspešno oddana!";
             
         } elseif (!$ze_oddano) {
-            // First submission - INSERT new record
+            // First submission - INSERT new record (ocena and komentar_ucitelj default to NULL)
             $sql_insert = "INSERT INTO oddaja (id_naloga, id_ucenec, besedilo_oddaje, pot_na_strezniku, status) 
                            VALUES (?, ?, ?, ?, 'Oddano')";
             $stmt_oddaja = $pdo->prepare($sql_insert);

@@ -32,10 +32,13 @@ if (!empty($search_query)) {
 }
 
 // DODAJANJE FILTRA ZA VLOGO/STATUS
+// Database enum values: 'pending', 'active', 'rejected'
 if ($vloga_filter === 'pending') {
-    $sql .= " AND status = 'cakanje'";
+    // Filter by status when 'pending' is selected (not by vloga)
+    $sql .= " AND status = 'pending'";
 } elseif ($vloga_filter === 'aktiven') {
-    $sql .= " AND status = 'aktiven'";
+    // Map 'aktiven' filter to 'active' status
+    $sql .= " AND status = 'active'";
 } elseif ($vloga_filter !== 'all') {
     // Filter by role if vloga_filter is set and not equal to 'all'
     $sql .= " AND vloga = :vloga_filter";
@@ -398,21 +401,31 @@ $admin_priimek = $_SESSION['priimek'] ?? 'Uporabnik';
                         <td><?php echo htmlspecialchars($u['email']); ?></td>
                         <td>
                             <span style="font-weight: bold;"><?php echo htmlspecialchars($u['vloga']); ?></span> 
-                            (<?php echo htmlspecialchars($u['status']); ?>)
+                            <?php 
+                            // Map database enum values to Slovenian for display
+                            $status_map = [
+                                'pending' => 'Čakanje',
+                                'active' => 'Aktiven',
+                                'rejected' => 'Zavrnjen',
+                                // Backward compatibility
+                                'cakanje' => 'Čakanje',
+                                'aktiven' => 'Aktiven',
+                                'blokiran' => 'Zavrnjen'
+                            ];
+                            $status_display = $status_map[$u['status']] ?? htmlspecialchars($u['status']);
+                            ?>
+                            (<span style="color: <?php 
+                                echo $u['status'] === 'active' ? '#28a745' : 
+                                    ($u['status'] === 'pending' ? '#ffc107' : '#dc3545'); 
+                            ?>;"><?php echo $status_display; ?></span>)
                         </td>
                         <td><?php echo $u['prvi_vpis'] ? 'DA' : 'NE'; ?></td>
                         <td>
                             <button class="btn btn-yellow btn-sm" 
                                     onclick="openEditModal(<?php echo htmlspecialchars(json_encode($u)); ?>)">Uredi</button>
 
-                            <?php if ($u['vloga'] === 'ucitelj'): ?>
+                            <?php if ($u['vloga'] === 'ucitelj' || $u['vloga'] === 'ucenec'): ?>
                                 <a href="admin_ucitelj_details.php?id=<?php echo $u['id_uporabnik']; ?>" 
-                                   class="btn btn-blue btn-sm" 
-                                   style="text-decoration: none; display: inline-block;">
-                                    Podrobnosti
-                                </a>
-                            <?php elseif ($u['vloga'] === 'ucenec'): ?>
-                                <a href="admin_ucenec_details.php?id=<?php echo $u['id_uporabnik']; ?>" 
                                    class="btn btn-blue btn-sm" 
                                    style="text-decoration: none; display: inline-block;">
                                     Podrobnosti
@@ -509,9 +522,9 @@ $admin_priimek = $_SESSION['priimek'] ?? 'Uporabnik';
             <div class="form-group">
                 <label for="edit_status">Status:</label>
                 <select id="edit_status" name="status" required>
-                    <option value="cakanje">Čakanje</option>
-                    <option value="aktiven">Aktiven</option>
-                    <option value="blokiran">Blokiran</option>
+                    <option value="pending">Čakanje</option>
+                    <option value="active">Aktiven</option>
+                    <option value="rejected">Zavrnjen</option>
                 </select>
             </div>
             <div class="form-group">
@@ -540,6 +553,19 @@ $admin_priimek = $_SESSION['priimek'] ?? 'Uporabnik';
             Nalaganje predmetov...
         </div>
         <p style="margin-top: 15px;">**Klik na predmet ga doda ali odstrani učitelju.**</p>
+    </div>
+</div>
+
+<div id="manageStudentSubjectsModal" class="modal">
+    <div class="modal-content">
+        <span class="close-btn" onclick="document.getElementById('manageStudentSubjectsModal').style.display='none';">&times;</span>
+        <h2>Upravljanje Predmetov za Učenca: <span id="student-name"></span></h2>
+        <input type="hidden" id="manage_id_ucenec">
+        <div id="student-subject-message" style="color: green; font-weight: bold; margin-bottom: 15px;"></div>
+        <div class="subject-list" id="student-subjects-container">
+            Nalaganje predmetov...
+        </div>
+        <p style="margin-top: 15px;">**Izberite predmet in učitelja ter kliknite "Dodeli" ali "Odstrani".**</p>
     </div>
 </div>
 
@@ -708,14 +734,54 @@ $admin_priimek = $_SESSION['priimek'] ?? 'Uporabnik';
      * Odpre modalno okno za urejanje in napolni polja
      */
     function openEditModal(userData) {
-        document.getElementById('edit_id_uporabnik').value = userData.id_uporabnik;
-        document.getElementById('edit_ime').value = userData.ime;
-        document.getElementById('edit_priimek').value = userData.priimek;
-        document.getElementById('edit_email').value = userData.email;
-        document.getElementById('edit_vloga').value = userData.vloga;
-        document.getElementById('edit_status').value = userData.status;
-        document.getElementById('edit_prvi_vpis').value = userData.prvi_vpis;
-        document.getElementById('edit-ime-priimek').textContent = userData.ime + ' ' + userData.priimek;
+        document.getElementById('edit_id_uporabnik').value = userData.id_uporabnik || '';
+        document.getElementById('edit_ime').value = userData.ime || '';
+        document.getElementById('edit_priimek').value = userData.priimek || '';
+        document.getElementById('edit_email').value = userData.email || '';
+        document.getElementById('edit_vloga').value = userData.vloga || '';
+        // CRITICAL: Ensure status is correctly set - handle both string and null values
+        // Database enum values: 'pending', 'active', 'rejected'
+        const statusSelect = document.getElementById('edit_status');
+        if (statusSelect) {
+            // Get the actual status value from userData
+            // Map old values to new if needed (for backward compatibility)
+            let statusValue = userData.status || 'pending';
+            
+            // Map old Slovenian values to new English enum values
+            const statusMap = {
+                'cakanje': 'pending',
+                'aktiven': 'active',
+                'blokiran': 'rejected'
+            };
+            if (statusMap[statusValue]) {
+                statusValue = statusMap[statusValue];
+            }
+            
+            // Set the value
+            statusSelect.value = statusValue;
+            
+            // Verify the value was set correctly
+            if (statusSelect.value !== statusValue) {
+                console.warn('Status value mismatch. Expected:', statusValue, 'Got:', statusSelect.value);
+                // Try to find the option and set it
+                const options = Array.from(statusSelect.options);
+                const matchingOption = options.find(opt => opt.value === statusValue);
+                if (matchingOption) {
+                    statusSelect.value = statusValue;
+                } else {
+                    // Fallback to first valid option (pending)
+                    statusSelect.value = 'pending';
+                    console.warn('Status value not found in options, using default: pending');
+                }
+            }
+            
+            // Final verification
+            console.log('Status set in modal:', statusSelect.value, 'from userData.status:', userData.status);
+        } else {
+            console.error('Status select element not found!');
+        }
+        document.getElementById('edit_prvi_vpis').value = userData.prvi_vpis !== undefined ? userData.prvi_vpis : '0';
+        document.getElementById('edit-ime-priimek').textContent = (userData.ime || '') + ' ' + (userData.priimek || '');
         document.getElementById('edit_novo_geslo').value = '';
         document.getElementById('edit-message').textContent = '';
 
@@ -731,6 +797,39 @@ $admin_priimek = $_SESSION['priimek'] ?? 'Uporabnik';
         const formData = new FormData(form);
         const data = {};
         formData.forEach((value, key) => (data[key] = value));
+        
+        // CRITICAL: Explicitly capture status from select element to ensure it's not empty
+        const statusSelect = document.getElementById('edit_status');
+        if (statusSelect) {
+            const statusValue = statusSelect.value;
+            if (!statusValue || statusValue === '') {
+                alert('Napaka: Status ni izbran. Prosimo izberite status.');
+                return;
+            }
+            data.status = statusValue; // Explicitly set status
+        } else {
+            alert('Napaka: Status dropdown ni najden.');
+            return;
+        }
+        
+        // CRITICAL: Verify all required fields are present
+        if (!data.id_uporabnik || !data.ime || !data.priimek || !data.email || !data.vloga || !data.status || data.prvi_vpis === undefined) {
+            alert('Napaka: Manjkajo obvezni podatki. Preverite, da so vsa polja izpolnjena.');
+            console.error('Missing data:', {
+                id_uporabnik: data.id_uporabnik,
+                ime: data.ime,
+                priimek: data.priimek,
+                email: data.email,
+                vloga: data.vloga,
+                status: data.status,
+                prvi_vpis: data.prvi_vpis
+            });
+            return;
+        }
+        
+        // Debug: Log the data being sent
+        console.log('Sending update data:', data);
+        console.log('Status value:', data.status, 'Type:', typeof data.status, 'Length:', data.status ? data.status.length : 0);
 
         const submitBtn = form.querySelector('button[type="submit"]');
         submitBtn.disabled = true;
@@ -744,7 +843,16 @@ $admin_priimek = $_SESSION['priimek'] ?? 'Uporabnik';
             });
             const result = await response.json();
             
-            document.getElementById('edit-message').textContent = result.message;
+            console.log('Update response:', result);
+            
+            // Show message with debug info if available
+            let messageText = result.message;
+            if (result.debug) {
+                console.log('Debug info:', result.debug);
+            }
+            
+            document.getElementById('edit-message').textContent = messageText;
+            document.getElementById('edit-message').style.color = result.success ? 'green' : 'red';
             
             if (result.success) {
                 // Po uspešni posodobitvi osveži stran
@@ -754,7 +862,9 @@ $admin_priimek = $_SESSION['priimek'] ?? 'Uporabnik';
                 }, 1000);
             }
         } catch (error) {
+            console.error('Update error:', error);
             document.getElementById('edit-message').textContent = 'Napaka pri komunikaciji: ' + error.message;
+            document.getElementById('edit-message').style.color = 'red';
         } finally {
             submitBtn.disabled = false;
             submitBtn.textContent = 'Shrani Spremembe';
@@ -884,6 +994,123 @@ $admin_priimek = $_SESSION['priimek'] ?? 'Uporabnik';
                 body: JSON.stringify({
                     id_ucitelj: idUcitelj,
                     id_predmet: idPredmet,
+                    action: action
+                })
+            });
+            const result = await response.json();
+
+            if (result.success) {
+                messageDiv.textContent = result.message;
+                messageDiv.style.color = 'green';
+                
+                // Posodobi gumb in razred takoj po uspehu
+                if (action === 'add') {
+                    btn.dataset.action = 'delete';
+                    btn.textContent = 'Odstrani';
+                    btn.className = 'btn btn-sm btn-red';
+                    itemDiv.classList.add('assigned');
+                } else {
+                    btn.dataset.action = 'add';
+                    btn.textContent = 'Dodeli';
+                    btn.className = 'btn btn-sm btn-green';
+                    itemDiv.classList.remove('assigned');
+                }
+            } else {
+                messageDiv.textContent = `Napaka: ${result.message}`;
+                messageDiv.style.color = 'red';
+            }
+        } catch (error) {
+            messageDiv.textContent = 'Napaka pri komunikaciji s strežnikom.';
+            messageDiv.style.color = 'red';
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
+    // ----------------------------------------------------
+    // FUNKCIJE ZA UPRAVLJANJE PREDMETOV ZA UČENCE
+    // ----------------------------------------------------
+
+    /**
+     * Odpre modalno okno za upravljanje predmetov učenca in naloži podatke
+     */
+    async function showStudentSubjectsModal(idUcenec, studentName) {
+        document.getElementById('student-name').textContent = studentName;
+        document.getElementById('manage_id_ucenec').value = idUcenec;
+        document.getElementById('student-subject-message').textContent = '';
+        document.getElementById('student-subjects-container').innerHTML = 'Nalaganje predmetov...';
+
+        try {
+            const response = await fetch(`admin_ajax_assign_subject.php?action=fetch&id_ucenec=${idUcenec}`);
+            const result = await response.json();
+
+            if (result.success) {
+                const container = document.getElementById('student-subjects-container');
+                container.innerHTML = '';
+                
+                // Group subjects by subject ID and show available teachers
+                result.subjects.forEach(subject => {
+                    const isAssigned = result.assigned_subjects.some(
+                        as => as.id_predmet == subject.id_predmet && as.id_ucitelj == subject.id_ucitelj
+                    );
+                    
+                    const div = document.createElement('div');
+                    div.className = 'subject-item ' + (isAssigned ? 'assigned' : '');
+                    div.innerHTML = `
+                        <div style="flex-grow: 1;">
+                            <strong>${subject.ime_predmeta}</strong>
+                            <br>
+                            <small>Učitelj: ${subject.ime_ucitelja} ${subject.priimek_ucitelja}</small>
+                        </div>
+                        <button class="btn btn-sm ${isAssigned ? 'btn-red' : 'btn-green'}" 
+                                data-id-predmet="${subject.id_predmet}" 
+                                data-id-ucitelj="${subject.id_ucitelj}"
+                                data-action="${isAssigned ? 'delete' : 'add'}">
+                            ${isAssigned ? 'Odstrani' : 'Dodeli'}
+                        </button>
+                    `;
+                    div.querySelector('button').addEventListener('click', manageStudentSubject);
+                    container.appendChild(div);
+                });
+
+                if (result.subjects.length === 0) {
+                    container.innerHTML = '<p>Ni na voljo predmetov z dodeljenimi učitelji.</p>';
+                }
+            } else {
+                document.getElementById('student-subjects-container').innerHTML = `<p style="color: red;">Napaka pri nalaganju: ${result.message}</p>`;
+            }
+
+        } catch (error) {
+            document.getElementById('student-subjects-container').innerHTML = `<p style="color: red;">Napaka pri komunikaciji: ${error.message}</p>`;
+        }
+
+        document.getElementById('manageStudentSubjectsModal').style.display = 'block';
+    }
+
+    /**
+     * Doda ali odstrani predmet učencu
+     */
+    async function manageStudentSubject(e) {
+        const btn = e.currentTarget;
+        const itemDiv = btn.closest('.subject-item');
+        const idUcenec = document.getElementById('manage_id_ucenec').value;
+        const idPredmet = btn.dataset.idPredmet;
+        const idUcitelj = btn.dataset.idUcitelj;
+        const action = btn.dataset.action;
+
+        btn.disabled = true;
+        btn.textContent = 'Procesiranje...';
+        const messageDiv = document.getElementById('student-subject-message');
+        messageDiv.textContent = '';
+
+        try {
+            const response = await fetch('admin_ajax_assign_subject.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id_ucenec: idUcenec,
+                    id_predmet: idPredmet,
+                    id_ucitelj: idUcitelj,
                     action: action
                 })
             });
