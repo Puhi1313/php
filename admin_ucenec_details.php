@@ -75,38 +75,141 @@ try {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Podrobnosti Učenca - Admin</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Momo+Trust+Display&family=Raleway:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
     <style>
-        body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f7f6; }
-        .header { background-color: #3f51b5; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; }
-        .header a { color: white; text-decoration: none; margin-left: 20px; font-weight: bold; }
-        .container { padding: 20px; max-width: 1200px; margin: 0 auto; }
+        html { color: #596235; }
+        body { 
+            margin: 0; 
+            padding: 0; 
+            font-family: "Raleway", sans-serif;
+            background:
+                radial-gradient(900px 500px at 10% -10%, rgba(205, 205, 182, 0.65), rgba(205, 205, 182, 0) 70%),
+                radial-gradient(900px 500px at 110% 10%, rgba(128, 133, 47, 0.18), rgba(128, 133, 47, 0) 60%),
+                linear-gradient(180deg, #f7f8f3 0%, #eff1e4 45%, #e3e6d1 100%);
+            background-attachment: fixed;
+            color: #596235;
+        }
+        .header { 
+            background: #cdcdb6; 
+            color: #596235; 
+            padding: 15px 20px; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .header h1 { margin: 0; font-size: 24px; font-weight: bold; }
+        .header a { 
+            color: #596235; 
+            text-decoration: none; 
+            margin-left: 20px; 
+            font-weight: 500;
+            transition: text-decoration 0.2s;
+        }
+        .header a:hover { text-decoration: underline; }
+        .container { 
+            padding: 20px; 
+            max-width: 1200px; 
+            margin: 20px auto; 
+        }
         
-        .profile-section { background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        .profile-section h2 { margin-top: 0; color: #3f51b5; }
+        .profile-section { 
+            background: #fff; 
+            padding: 20px; 
+            border-radius: 16px; 
+            margin-bottom: 20px; 
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+            border: 1px solid #cdcdb6;
+        }
+        .profile-section h2 { 
+            margin-top: 0; 
+            color: #596235; 
+            border-bottom: 2px solid #cdcdb6;
+            padding-bottom: 10px;
+        }
         .profile-info { display: flex; gap: 20px; align-items: center; }
-        .profile-pic { width: 100px; height: 100px; border-radius: 50%; object-fit: cover; border: 3px solid #3f51b5; }
+        .profile-pic { 
+            width: 100px; 
+            height: 100px; 
+            border-radius: 50%; 
+            object-fit: cover; 
+            border: 3px solid #cdcdb6; 
+        }
         
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #ddd; }
-        th { background-color: #e0e0e0; font-weight: bold; }
-        tr:hover { background-color: #f1f1f1; }
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin-top: 15px; 
+        }
+        th, td { 
+            padding: 12px 15px; 
+            text-align: left; 
+            border-bottom: 1px solid #ddd; 
+        }
+        th { 
+            background-color: #f8f8f0; 
+            font-weight: 600; 
+            color: #596235;
+        }
+        tr { 
+            transition: background 0.2s, transform 0.15s ease, box-shadow 0.15s ease;
+        }
+        tr:hover { 
+            background-color: #e6e6fa; 
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        }
         
-        .subject-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
-        .subject-item { background: #e3f2fd; padding: 8px 15px; border-radius: 20px; }
+        .subject-list { 
+            display: flex; 
+            flex-wrap: wrap; 
+            gap: 10px; 
+            margin-top: 10px; 
+        }
+        .subject-item { 
+            background: #e3f2fd; 
+            padding: 10px 15px; 
+            border-radius: 20px; 
+            border: 1px solid #cdcdb6;
+            transition: background 0.2s, border-color 0.2s, transform 0.15s ease, box-shadow 0.15s ease;
+        }
+        .subject-item:hover {
+            background: #d0e7f7;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+        }
         
-        .status-badge { padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; }
-        .status-oddano { background-color: #4CAF50; color: white; }
-        .status-ocenjeno { background-color: #2196F3; color: white; }
-        .status-manjkajoce { background-color: #ff9800; color: white; }
-        .status-zamujeno { background-color: #f44336; color: white; }
+        .status-badge { 
+            padding: 6px 12px; 
+            border-radius: 15px; 
+            font-size: 12px; 
+            font-weight: 600; 
+            display: inline-block;
+        }
+        .status-oddano { background-color: #6b8c7d; color: white; }
+        .status-ocenjeno { background-color: #80852f; color: white; }
+        .status-manjkajoce { background-color: #d4a574; color: #596235; }
+        .status-zamujeno { background-color: #a85d4a; color: white; }
         
-        .grade { font-weight: bold; font-size: 1.1em; }
-        .grade-excellent { color: #4CAF50; }
-        .grade-good { color: #2196F3; }
-        .grade-average { color: #ff9800; }
-        .grade-poor { color: #f44336; }
+        .grade { 
+            font-weight: bold; 
+            font-size: 1.1em; 
+        }
+        .grade-excellent { color: #6b8c7d; }
+        .grade-good { color: #80852f; }
+        .grade-average { color: #d4a574; }
+        .grade-poor { color: #a85d4a; }
         
-        .error { color: red; padding: 10px; background: #ffebee; border-radius: 4px; margin-bottom: 20px; }
+        .error { 
+            color: #a85d4a; 
+            padding: 15px; 
+            background: #ffebee; 
+            border-radius: 10px; 
+            margin-bottom: 20px; 
+            border: 1px solid #f44336;
+        }
     </style>
 </head>
 <body>

@@ -137,33 +137,238 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Momo+Trust+Display&family=Raleway:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
     <style>
-        :root {
-            --bg: #f7f8f3;
-            --card: #ffffff;
-            --accent: #596235; /* olive green matching teacher classroom */
-            --accent-soft: #cdcdb6;
-            --muted: #6b6b6b;
+        html { color: #596235; }
+        body {
+            margin: 0;
+            padding: 24px;
+            font-family: "Raleway", sans-serif;
+            background:
+                radial-gradient(900px 500px at 10% -10%, rgba(205, 205, 182, 0.65), rgba(205, 205, 182, 0) 70%),
+                radial-gradient(900px 500px at 110% 10%, rgba(128, 133, 47, 0.18), rgba(128, 133, 47, 0) 60%),
+                linear-gradient(180deg, #f7f8f3 0%, #eff1e4 45%, #e3e6d1 100%);
+            background-attachment: fixed;
+            color: #596235;
+            min-height: 100vh;
         }
-        body{font-family:"Raleway", sans-serif;background:var(--bg);padding:24px;color:#596235;}
-        .card{max-width:820px;margin:24px auto;background:var(--card);padding:22px;border-radius:12px;box-shadow:0 6px 20px rgba(89,98,53,0.08);border:1px solid var(--accent-soft);}
-        .top{display:flex;gap:18px;align-items:center}
-        .profile-pic{width:120px;height:120px;border-radius:50%;object-fit:cover;border:4px solid var(--accent-soft);background:var(--accent-soft)}
-        h2{margin:0 0 6px 0;color:var(--accent)}
-        .sub{color:var(--muted);margin:6px 0 0 0}
-        .controls{margin-top:18px;display:flex;gap:18px;flex-wrap:wrap}
-        .box{flex:1;min-width:260px;background:#f8f8f0;border:1px solid var(--accent-soft);padding:14px;border-radius:10px}
-        label{display:block;margin-top:8px;font-weight:600;color:#596235}
-        input[type="password"], input[type="file"]{width:100%;padding:10px;margin-top:8px;border:1px solid var(--accent-soft); border-radius:8px;background:#fff;font-family:"Raleway", sans-serif;color:#596235}
-        .help{font-size:0.9rem;color:var(--muted);margin-top:6px}
-        .btn{display:inline-block;padding:10px 14px;background:var(--accent);color:#fff;border-radius:8px;border:none;cursor:pointer;margin-top:12px;font-family:"Raleway", sans-serif;font-weight:500;transition:background 0.3s}
-        .btn:hover{background:#4a5230}
-        .msg{padding:10px;border-radius:8px;margin-bottom:12px}
-        .success{background:#e9f8ef;color:#0b603a;border:1px solid #bfe6cc}
-        .error{background:#fff1f1;color:#8a1a1a;border:1px solid #ffcccc}
-        .readonly-field{font-weight:600;padding:8px 10px;border-radius:8px;background:#f8f8f0;border:1px solid var(--accent-soft);display:inline-block}
-        a.back{color:var(--accent);text-decoration:none;font-weight:600}
-        a.back:hover{text-decoration:underline}
-        @media(max-width:720px){ .top{flex-direction:column;align-items:flex-start} .controls{flex-direction:column} }
+        .card {
+            max-width: 900px;
+            margin: 24px auto;
+            background: #fff;
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+            border: 1px solid #cdcdb6;
+        }
+        .top {
+            display: flex;
+            gap: 24px;
+            align-items: center;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #cdcdb6;
+            margin-bottom: 24px;
+        }
+        .profile-pic {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            object-fit: cover;
+            background: #cdcdb6;
+        }
+        h2 {
+            margin: 0 0 8px 0;
+            color: #596235;
+            font-size: 28px;
+        }
+        .sub {
+            color: #6c7450;
+            margin: 4px 0 0 0;
+            font-size: 16px;
+        }
+        .controls {
+            margin-top: 24px;
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        .box {
+            flex: 1;
+            min-width: 280px;
+            background: #f8f8f0;
+            border: 1px solid #cdcdb6;
+            padding: 20px;
+            border-radius: 12px;
+            transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.2s ease;
+        }
+        .box:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(0,0,0,0.07);
+            border-color: #80852f;
+        }
+        .box h3 {
+            margin: 0 0 12px 0;
+            color: #596235;
+            font-size: 20px;
+            border-bottom: 2px solid #cdcdb6;
+            padding-bottom: 8px;
+        }
+        label {
+            display: block;
+            margin-top: 12px;
+            font-weight: 600;
+            color: #596235;
+        }
+        input[type="password"], 
+        input[type="file"] {
+            width: 100%;
+            padding: 10px;
+            margin-top: 8px;
+            border: 1px solid #cdcdb6;
+            border-radius: 8px;
+            background: #fff;
+            font-family: "Raleway", sans-serif;
+            color: #596235;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            box-sizing: border-box;
+        }
+        input[type="password"]:focus,
+        input[type="file"]:focus {
+            outline: none;
+            border-color: #80852f;
+            box-shadow: 0 0 0 3px rgba(128, 133, 47, 0.1);
+        }
+        .help {
+            font-size: 0.9rem;
+            color: #6c7450;
+            margin-top: 8px;
+            line-height: 1.5;
+        }
+        .btn {
+            display: inline-block;
+            padding: 10px 18px;
+            background: #596235;
+            color: #fff;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            margin-top: 12px;
+            font-family: "Raleway", sans-serif;
+            font-weight: 500;
+            transition: background 0.3s, transform 0.15s ease, box-shadow 0.15s ease;
+        }
+        .btn:hover {
+            background: #4a5230;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .btn-secondary {
+            background: #80852f;
+        }
+        .btn-secondary:hover {
+            background: #6a6f26;
+        }
+        .msg {
+            padding: 12px 16px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            border: 1px solid;
+        }
+        .success {
+            background: #e9f8ef;
+            color: #0b603a;
+            border-color: #bfe6cc;
+        }
+        .error {
+            background: #fff1f1;
+            color: #8a1a1a;
+            border-color: #ffcccc;
+        }
+        a.back {
+            color: #596235;
+            text-decoration: none;
+            font-weight: 600;
+            transition: color 0.2s, text-decoration 0.2s;
+        }
+        a.back:hover {
+            text-decoration: underline;
+            color: #80852f;
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        /* Drag & Drop area */
+        .dropzone {
+            position: relative;
+            border: 2px dashed #cdcdb6;
+            border-radius: 14px;
+            background: #f8f8f0;
+            padding: 26px;
+            text-align: center;
+            color: #596235;
+            transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+            margin-top: 8px;
+            margin-bottom: 15px;
+            cursor: pointer;
+        }
+        .dropzone:hover { 
+            box-shadow: 0 6px 16px rgba(0,0,0,0.06); 
+        }
+        .dropzone.dragover {
+            border-color: #80852f;
+            background: #eef0e1;
+        }
+        .dropzone .dz-icon { 
+            font-size: 42px; 
+            margin-bottom: 10px; 
+            display: block; 
+        }
+        .dropzone .dz-title { 
+            font-weight: 700; 
+            margin: 6px 0; 
+            color: #596235;
+        }
+        .dropzone .dz-sub { 
+            color: #6c7450; 
+            margin-bottom: 12px; 
+        }
+        .dropzone .dz-browse { 
+            padding: 8px 15px; 
+            background: #596235; 
+            color: #fff; 
+            border: none; 
+            border-radius: 6px; 
+            cursor: pointer; 
+            transition: background 0.3s, transform 0.15s ease; 
+            font-family: "Raleway", sans-serif; 
+            font-size: 14px; 
+            font-weight: 500;
+        }
+        .dropzone .dz-browse:hover { 
+            background: #4a5230; 
+            transform: translateY(-1px); 
+        }
+        .dropzone .dz-file-name { 
+            margin-top: 8px; 
+            font-size: 14px; 
+            color: #6c7450; 
+        }
+        input[type="file"] {
+            display: none;
+        }
+        @media(max-width: 720px) {
+            .top {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .controls {
+                flex-direction: column;
+            }
+            .card {
+                padding: 20px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -173,7 +378,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <?php if (!empty($user['icona_profila']) && file_exists(__DIR__ . DIRECTORY_SEPARATOR . $user['icona_profila'])): ?>
                 <img src="<?php echo htmlspecialchars($user['icona_profila']); ?>" class="profile-pic" alt="Profilna slika">
             <?php else: ?>
-                <div class="profile-pic" style="display:flex;align-items:center;justify-content:center;color:#fff;background:var(--accent);font-weight:700;font-size:2em">
+                <div class="profile-pic" style="display:flex;align-items:center;justify-content:center;color:#fff;background:#596235;font-weight:700;font-size:2.5em">
                     <?php echo strtoupper(substr($user['ime'],0,1) . substr($user['priimek'],0,1)); ?>
                 </div>
             <?php endif; ?>
@@ -190,15 +395,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <div class="controls">
         <div class="box">
-            <h3 style="margin:0;color:var(--accent)">Profilna slika</h3>
+            <h3>Profilna slika</h3>
             <p class="help">Naložite novo profilno sliko (JPEG/PNG/GIF, max 2MB). Slika se shrani v mapo "slike".</p>
             <?php if (array_key_exists('icona_profila', $user)): ?>
                 <form method="post" enctype="multipart/form-data" id="picForm">
-                    <label for="profile_pic">Izberi datoteko</label>
-                    <input type="file" name="profile_pic" id="profile_pic" accept="image/*">
-                    <div style="display:flex;gap:10px;align-items:center;">
+                    <div id="dz-profile" class="dropzone">
+                        <span class="dz-icon">☁️</span>
+                        <div class="dz-title">Povlecite in spustite sliko sem</div>
+                        <div class="dz-sub">ALI</div>
+                        <button type="button" class="dz-browse">Izberite sliko</button>
+                        <div class="dz-file-name" id="dz-profile-filename">Ni izbrane slike</div>
+                        <input type="file" name="profile_pic" id="profile_pic" accept="image/*">
+                    </div>
+                    <div class="button-group">
                         <button type="submit" class="btn">Naloži sliko</button>
-                        <button type="button" class="btn" style="background:#80852f" onclick="document.getElementById('profile_pic').value=''">Prekliči</button>
+                        <button type="button" class="btn btn-secondary" onclick="resetProfilePic()">Prekliči</button>
                     </div>
                 </form>
             <?php else: ?>
@@ -207,7 +418,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
 
         <div class="box">
-            <h3 style="margin:0;color:var(--accent)">Spremeni geslo</h3>
+            <h3>Spremeni geslo</h3>
             <p class="help">Za spremembo gesla vnesite trenutno in novo geslo.</p>
             <form method="post" id="pwdForm">
                 <label>Trenutno geslo</label>
@@ -228,8 +439,75 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </div>
 
 <script>
-    // Keep forms separate so user can upload picture or change password independently.
-    // No JS required beyond basic; page posts full form. If both fields filled, server will process both.
+    // Drag & Drop for profile picture
+    function initDropzone({ wrapperId, inputId, fileNameId }) {
+        const wrapper = document.getElementById(wrapperId);
+        const input = document.getElementById(inputId);
+        const fileName = document.getElementById(fileNameId);
+        if (!wrapper || !input) return;
+
+        const browseBtn = wrapper.querySelector('.dz-browse');
+
+        // Click to open dialog
+        if (browseBtn) browseBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            input.click();
+        });
+        wrapper.addEventListener('click', (e) => {
+            if (e.target.classList.contains('dz-browse')) return;
+            input.click();
+        });
+
+        ['dragenter','dragover'].forEach(evt => {
+            wrapper.addEventListener(evt, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                wrapper.classList.add('dragover');
+            });
+        });
+        ['dragleave','dragend','drop'].forEach(evt => {
+            wrapper.addEventListener(evt, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                wrapper.classList.remove('dragover');
+            });
+        });
+
+        wrapper.addEventListener('drop', (e) => {
+            if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) {
+                input.files = e.dataTransfer.files;
+                updateDzFileName();
+            }
+        });
+
+        input.addEventListener('change', updateDzFileName);
+
+        function updateDzFileName() {
+            if (!fileName) return;
+            if (input.files && input.files.length) {
+                const names = Array.from(input.files).map(f => f.name).join(', ');
+                fileName.textContent = names;
+            } else {
+                fileName.textContent = 'Ni izbrane slike';
+            }
+        }
+    }
+
+    function resetProfilePic() {
+        const input = document.getElementById('profile_pic');
+        const fileName = document.getElementById('dz-profile-filename');
+        if (input) input.value = '';
+        if (fileName) fileName.textContent = 'Ni izbrane slike';
+    }
+
+    // Initialize dropzone on page load
+    document.addEventListener('DOMContentLoaded', () => {
+        initDropzone({
+            wrapperId: 'dz-profile',
+            inputId: 'profile_pic',
+            fileNameId: 'dz-profile-filename'
+        });
+    });
 </script>
 </body>
 </html>

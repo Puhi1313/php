@@ -64,73 +64,277 @@ $admin_priimek = $_SESSION['priimek'] ?? 'Uporabnik';
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Panel</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Momo+Trust+Display&family=Raleway:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
     <style>
-        body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f7f6; }
-        .header { background-color: #3f51b5; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; }
-        .header a { color: white; text-decoration: none; margin-left: 20px; font-weight: bold; }
-        .container { padding: 20px; }
+        html { color: #596235; }
+        body { 
+            margin: 0; 
+            padding: 0; 
+            font-family: "Raleway", sans-serif;
+            background:
+                radial-gradient(900px 500px at 10% -10%, rgba(205, 205, 182, 0.65), rgba(205, 205, 182, 0) 70%),
+                radial-gradient(900px 500px at 110% 10%, rgba(128, 133, 47, 0.18), rgba(128, 133, 47, 0) 60%),
+                linear-gradient(180deg, #f7f8f3 0%, #eff1e4 45%, #e3e6d1 100%);
+            background-attachment: fixed;
+            color: #596235;
+        }
+        .header { 
+            background: #cdcdb6; 
+            color: #596235; 
+            padding: 15px 20px; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .header h1 { margin: 0; font-size: 24px; font-weight: bold; }
+        .header a { 
+            color: #596235; 
+            text-decoration: none; 
+            margin-left: 20px; 
+            font-weight: 500;
+            transition: text-decoration 0.2s;
+        }
+        .header a:hover { text-decoration: underline; }
+        .container { 
+            max-width: 1400px;
+            margin: 20px auto;
+            padding: 20px;
+            background: #fff;
+            border: 1px solid #cdcdb6;
+            border-radius: 16px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+        }
         
         /* ZAVIHKE */
-        .tab-menu { display: flex; border-bottom: 2px solid #ccc; margin-bottom: 20px; }
+        .tab-menu { 
+            display: flex; 
+            border-bottom: 2px solid #ddd; 
+            margin-bottom: 20px; 
+        }
         .tab-button { 
             padding: 10px 15px; 
             cursor: pointer; 
-            border: 1px solid transparent;
+            border: 1px solid #ddd;
             border-bottom: none;
-            background-color: #eee;
+            background: #eee;
             margin-right: 5px;
-            border-top-left-radius: 5px;
-            border-top-right-radius: 5px;
+            border-radius: 10px 10px 0 0;
+            color: #596235;
+            transition: background 0.3s, transform 0.15s ease;
         }
+        .tab-button:hover { transform: translateY(-1px); }
         .tab-button.active { 
-            background-color: white; 
-            border: 1px solid #ccc; 
-            border-bottom: 2px solid white; 
+            background: #fff; 
+            border-color: #cdcdb6; 
+            border-bottom: 2px solid #fff; 
             font-weight: bold; 
         }
-        .tab-content { background-color: white; padding: 20px; border: 1px solid #ccc; border-top: none; }
+        .tab-content { 
+            background-color: #fff; 
+            padding: 20px; 
+            border: 1px solid #cdcdb6; 
+            border-top: none; 
+            border-radius: 0 10px 10px 10px;
+        }
         .tab-pane { display: none; }
         .tab-pane.active { display: block; }
 
         /* TABELA */
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #ddd; }
-        th { background-color: #e0e0e0; }
-        tr:hover { background-color: #f1f1f1; }
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin-top: 20px; 
+        }
+        th, td { 
+            padding: 12px 15px; 
+            text-align: left; 
+            border-bottom: 1px solid #ddd; 
+        }
+        th { 
+            background-color: #f8f8f0; 
+            color: #596235;
+            font-weight: 600;
+        }
+        tr { 
+            transition: background 0.2s, transform 0.15s ease, box-shadow 0.15s ease;
+        }
+        tr:hover { 
+            background-color: #e6e6fa; 
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        }
+        td:last-child {
+            white-space: nowrap;
+            min-width: 500px;
+        }
+        td:last-child .btn {
+            margin-bottom: 0;
+            display: inline-block;
+        }
 
-        .btn { padding: 8px 12px; border: none; cursor: pointer; border-radius: 4px; margin-right: 5px; }
-        .btn-green { background-color: #4CAF50; color: white; }
-        .btn-red { background-color: #f44336; color: white; }
-        .btn-blue { background-color: #2196F3; color: white; }
-        .btn-yellow { background-color: #ffc107; color: black; }
+        .btn { 
+            padding: 8px 12px; 
+            border: none; 
+            cursor: pointer; 
+            border-radius: 6px; 
+            margin-right: 5px; 
+            font-family: "Raleway", sans-serif;
+            font-weight: 500;
+            transition: background 0.3s, transform 0.15s ease, box-shadow 0.15s ease;
+        }
+        .btn:hover { 
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .btn-green { background-color: #6b8c7d; color: white; }
+        .btn-green:hover { background-color: #5a7568; }
+        .btn-red { background-color: #a85d4a; color: white; }
+        .btn-red:hover { background-color: #8f4d3d; }
+        .btn-blue { background-color: #80852f; color: white; }
+        .btn-blue:hover { background-color: #6a6f26; }
+        .btn-yellow { background-color: #d4a574; color: #596235; }
+        .btn-yellow:hover { background-color: #c1945f; }
         .btn-sm { padding: 5px 8px; font-size: 12px; }
 
-        .profile-icon { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; vertical-align: middle; margin-right: 10px; }
+        .profile-icon { 
+            width: 40px; 
+            height: 40px; 
+            border-radius: 50%; 
+            object-fit: cover; 
+            vertical-align: middle; 
+            margin-right: 10px; 
+        }
 
         /* Modal */
         .modal {
-            display: none; position: fixed; z-index: 10; left: 0; top: 0; width: 100%; height: 100%;
-            overflow: auto; background-color: rgba(0,0,0,0.4);
+            display: none; 
+            position: fixed; 
+            z-index: 10; 
+            left: 0; 
+            top: 0; 
+            width: 100%; 
+            height: 100%;
+            overflow: auto; 
+            background-color: rgba(0,0,0,0.4);
         }
         .modal-content {
-            background-color: #fefefe; margin: 15% auto; padding: 20px; border: 1px solid #888;
-            width: 80%; max-width: 600px; border-radius: 8px; position: relative;
+            background-color: #fefefe; 
+            margin: 5% auto; 
+            padding: 20px; 
+            border: 1px solid #cdcdb6;
+            width: 80%; 
+            max-width: 600px; 
+            border-radius: 16px; 
+            position: relative;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
         }
-        .close-btn { color: #aaa; float: right; font-size: 28px; font-weight: bold; }
-        .close-btn:hover, .close-btn:focus { color: black; text-decoration: none; cursor: pointer; }
+        .close-btn { 
+            color: #aaa; 
+            float: right; 
+            font-size: 28px; 
+            font-weight: bold; 
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+        .close-btn:hover, .close-btn:focus { 
+            color: #596235; 
+            text-decoration: none; 
+        }
         
         /* Obrazci */
         .form-group { margin-bottom: 15px; }
-        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; }
-        .form-group input, .form-group select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        .form-group label { 
+            display: block; 
+            margin-bottom: 5px; 
+            font-weight: 600; 
+            color: #596235;
+        }
+        .form-group input, .form-group select { 
+            width: 100%; 
+            padding: 10px; 
+            border: 1px solid #cdcdb6; 
+            border-radius: 8px; 
+            box-sizing: border-box; 
+            font-family: "Raleway", sans-serif;
+            color: #596235;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: #80852f;
+            box-shadow: 0 0 0 3px rgba(128, 133, 47, 0.1);
+        }
         
         /* Za Predmete */
-        .subject-list { max-height: 200px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; border-radius: 4px; }
-        .subject-item { 
-            padding: 8px; margin-bottom: 5px; background-color: #f9f9f9; 
-            border: 1px solid #eee; display: flex; justify-content: space-between; align-items: center;
+        .subject-list { 
+            max-height: 200px; 
+            overflow-y: auto; 
+            border: 1px solid #cdcdb6; 
+            padding: 10px; 
+            border-radius: 10px; 
+            background: #f8f8f0;
         }
-        .subject-item.assigned { background-color: #d4edda; border-color: #c3e6cb; }
+        .subject-item { 
+            padding: 10px; 
+            margin-bottom: 5px; 
+            background-color: #fff; 
+            border: 1px solid #ddd; 
+            border-radius: 10px;
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center;
+            transition: background 0.2s, border-color 0.2s, transform 0.15s ease, box-shadow 0.15s ease;
+        }
+        .subject-item:hover {
+            background: #e6e6fa;
+            border-color: #cdcdb6;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+        }
+        .subject-item.assigned { 
+            background-color: #e3f2fd; 
+            border-color: #cdcdb6; 
+        }
+        
+        /* Search and Filter Form */
+        form[method="GET"] {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #f8f8f0;
+            border-radius: 10px;
+            border: 1px solid #cdcdb6;
+        }
+        form[method="GET"] input[type="text"] {
+            flex: 1;
+            min-width: 200px;
+            padding: 10px;
+            border: 1px solid #cdcdb6;
+            border-radius: 8px;
+            font-family: "Raleway", sans-serif;
+        }
+        form[method="GET"] select {
+            padding: 10px;
+            border: 1px solid #cdcdb6;
+            border-radius: 8px;
+            font-family: "Raleway", sans-serif;
+            color: #596235;
+        }
+        form[method="GET"] button {
+            white-space: nowrap;
+        }
+        h2 {
+            color: #596235;
+            border-bottom: 2px solid #cdcdb6;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
     </style>
 </head>
 <body>
@@ -157,9 +361,9 @@ $admin_priimek = $_SESSION['priimek'] ?? 'Uporabnik';
             <p style="color: red;"><?php echo htmlspecialchars($error_message); ?></p>
         <?php endif; ?>
 
-        <form method="GET" action="adminPage.php" style="margin-bottom: 20px;">
-            <input type="text" name="s" placeholder="Išči po imenu, priimku ali e-mailu" value="<?php echo htmlspecialchars($search_query); ?>" style="padding: 8px; width: 40%;">
-            <select name="vloga" style="padding: 8px;">
+        <form method="GET" action="adminPage.php">
+            <input type="text" name="s" placeholder="Išči po imenu, priimku ali e-mailu" value="<?php echo htmlspecialchars($search_query); ?>">
+            <select name="vloga">
                 <option value="all" <?php echo $vloga_filter === 'all' ? 'selected' : ''; ?>>Vse Vloge (Aktivne)</option>
                 <option value="pending" <?php echo $vloga_filter === 'pending' ? 'selected' : ''; ?>>Čakajoči na Aktivacijo</option>
                 <option value="admin" <?php echo $vloga_filter === 'admin' ? 'selected' : ''; ?>>Administratorji</option>
