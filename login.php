@@ -1,104 +1,116 @@
 <?php
+// ---------------------------
+// 🔐 VARNOSTNE NASTAVITVE
+// ---------------------------
+session_set_cookie_params([
+    'lifetime' => 0, // sejni piškotek - velja do zaprtja brskalnika
+    'path' => '/',
+    'domain' => 'projekt-smv.kesug.com', // <-- prilagodi svoji domeni
+    'secure' => true, // samo prek HTTPS
+    'httponly' => true, // JS ne more dostopati
+    'samesite' => 'Strict' // prepreči CSRF prek tujih strani
+]);
 session_start();
-require_once 'povezava.php'; // Include PDO connection
+
+require_once 'povezava.php'; // mora imeti $pdo (PDO povezavo)
 
 $error_message = '';
 
-// Quick redirect for already logged-in users
+// Če je uporabnik že prijavljen, preusmeri na pravo stran
 if (isset($_SESSION['user_id']) && isset($_SESSION['vloga'])) {
-    if ($_SESSION['vloga'] === 'admin') { 
-        header('Location: adminPage.php');
-        exit();
-    }
-    if ($_SESSION['vloga'] === 'ucitelj') {
-        // PREUSMERITEV ZA UČITELJA NA NOVO STRAN
-        header('Location: ucitelj_ucilnica.php'); 
-        exit();
-    } elseif ($_SESSION['vloga'] === 'ucenec') {
-        if ($_SESSION['prvi_vpis'] == 1) {
-            header('Location: predmetiPage.php');
-            exit();
-        } else {
-            // PREUSMERITEV ZA UČENCA NA NOVO STRAN
-            header('Location: ucenec_ucilnica.php'); 
-            exit();
-        }
+    switch ($_SESSION['vloga']) {
+        case 'admin':
+            header('Location: adminPage.php');
+            exit;
+        case 'ucitelj':
+            header('Location: ucitelj_ucilnica.php');
+            exit;
+        case 'ucenec':
+            if ($_SESSION['prvi_vpis'] == 1) {
+                header('Location: predmetiPage.php');
+            } else {
+                header('Location: ucenec_ucilnica.php');
+            }
+            exit;
     }
 }
 
+// ---------------------------
+// 🧠 OBDELAVA PRIJAVE
+// ---------------------------
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email = trim($_POST['email'] ?? '');
-    $geslo = $_POST['geslo'] ?? ''; 
+    $geslo = $_POST['geslo'] ?? '';
+    $recaptchaResponse = $_POST['g-recaptcha-response'] ?? '';
 
+    // Preveri, da polja niso prazna
     if (empty($email) || empty($geslo)) {
         $error_message = 'Vnesite e-mail in geslo.';
     } else {
-        try {
-            // DODANO: Pri pridobivanju podatkov dodamo tudi 'status'
-            $sql = "SELECT id_uporabnik, vloga, geslo, prvi_vpis, status FROM uporabnik WHERE email = ?";
-            $stmt = $pdo->prepare($sql);
-            $stmt->execute([$email]);
-            $uporabnik = $stmt->fetch();
-            
-            // ZAČASNO DEBUGIRANJE - ODSTRANITE, KO BO DELOVALO!
-            if ($uporabnik) {
-                // 1. Izpiši vneseno geslo in hash iz baze
-                error_log("Preverjam: Vneseno: " . $geslo . " | Hash v DB: " . $uporabnik['geslo']);
+        // ---------------------------
+        // ✅ reCAPTCHA PREVERJANJE
+        // ---------------------------
+       // $secretKey = '6LeVkwosAAAAAA16FyZVxsPjxkIQyhHYMXb13nPU'; // <-- sem dodaj svoj secret key
+        //$verify = file_get_contents("https://www.google.com/recaptcha/api/siteverify?secret={$secretKey}&response={$recaptchaResponse}");
+       // $captchaSuccess = json_decode($verify);
 
-                // 2. Preveri, ali password_verify deluje
-                if (password_verify($geslo, $uporabnik['geslo'])) {
-                    error_log("DEBUG: PASSWORD VERIFY JE VRNIL TRUE!");
-                } else {
-                    error_log("DEBUG: PASSWORD VERIFY JE VRNIL FALSE!");
-                }
-            }
-            // KONEC ZAČASNEGA DEBUGIRANJA
+       // if (!$captchaSuccess->success) {
+       //     $error_message = 'Potrdite, da niste robot.';
+       // } else {
+            // ---------------------------
+            // 🧩 PREVERJANJE UPORABNIKA
+            // ---------------------------
+            try {
+                $stmt = $pdo->prepare("SELECT id_uporabnik, vloga, geslo, prvi_vpis, status 
+                                       FROM uporabnik 
+                                       WHERE email = ?");
+                $stmt->execute([$email]);
+                $uporabnik = $stmt->fetch(PDO::FETCH_ASSOC);
 
-            if ($uporabnik) {
-                if (password_verify($geslo, $uporabnik['geslo'])) {
-                    
-                    // Preveri status
-                    if ($uporabnik['status'] !== 'active') {
-                         $error_message = 'Vaš račun je še v obravnavi ali je bil zavrnjen. Kontaktirajte administratorja.';
-                    } else {
-                        // USPEŠNA PRIJAVA in AKTIVEN STATUS
-                        $_SESSION['user_id'] = $uporabnik['id_uporabnik'];
-                        $_SESSION['vloga'] = $uporabnik['vloga'];
-                        $_SESSION['prvi_vpis'] = $uporabnik['prvi_vpis'];
-                        
-                        // PREUSMERITEV NA NOVE STRANI
-                        if ($uporabnik['vloga'] === 'admin') {
-                            header('Location: adminPage.php');
-                            exit();
-                        } elseif ($uporabnik['vloga'] === 'ucitelj') {
-                            header('Location: ucitelj_ucilnica.php');
-                            exit();
-                        } elseif ($uporabnik['vloga'] === 'ucenec') {
-                            if ($uporabnik['prvi_vpis'] == 1) {
-                                header('Location: predmetiPage.php');
-                                exit();
-                            } else {
-                                header('Location: ucenec_ucilnica.php');
-                                exit();
+                if ($uporabnik) {
+                    if (password_verify($geslo, $uporabnik['geslo'])) {
+                        if ($uporabnik['status'] !== 'active') {
+                            $error_message = 'Vaš račun še ni aktiven. Kontaktirajte administratorja.';
+                        } else {
+                            // 🟢 USPEŠNA PRIJAVA
+                            $_SESSION['user_id'] = $uporabnik['id_uporabnik'];
+                            $_SESSION['vloga'] = $uporabnik['vloga'];
+                            $_SESSION['prvi_vpis'] = $uporabnik['prvi_vpis'];
+
+                            // Preusmeri glede na vlogo
+                            switch ($uporabnik['vloga']) {
+                                case 'admin':
+                                    header('Location: adminPage.php');
+                                    break;
+                                case 'ucitelj':
+                                    header('Location: ucitelj_ucilnica.php');
+                                    break;
+                                case 'ucenec':
+                                    if ($uporabnik['prvi_vpis'] == 1) {
+                                        header('Location: predmetiPage.php');
+                                    } else {
+                                        header('Location: ucenec_ucilnica.php');
+                                    }
+                                    break;
                             }
+                            exit;
                         }
-                    } // konec preverjanja statusa
+                    } else {
+                        $error_message = 'Napačno geslo.';
+                    }
                 } else {
-                    $error_message = 'Napačno geslo.';
+                    $error_message = 'Uporabnik s tem e-mailom ne obstaja.';
                 }
-            } else {
-                $error_message = 'Uporabnik s tem e-mail naslovom ne obstaja.';
+            } catch (PDOException $e) {
+                error_log("Login Error: " . $e->getMessage());
+                $error_message = 'Pri prijavi je prišlo do napake. Poskusite znova.';
             }
-
-        } catch (\PDOException $e) {
-            $error_message = 'Napaka pri prijavi. Poskusite znova.';
-            error_log("Login Error: " . $e->getMessage()); 
-        }
+       // }
     }
 }
-
-
 ?>
+
+
 
 <!DOCTYPE html>
 <html lang="sl">
@@ -316,6 +328,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <label for="geslo">Geslo:</label>
                     <input type="password" placeholder="Enter your password" id="geslo" name="geslo" required>
                 </div>
+               <!-- <div class="g-recaptcha" data-sitekey="6LeVkwosAAAAADztMG0NMVDNvlu2T-w2KPytYOl7"></div> -->
+                <!--<script src="https://www.google.com/recaptcha/api.js" async defer></script> -->
                 <button type="submit">Prijava</button>
             </form>
             <p style="margin-top: 15px;">Še nimate računa? <a href="registration.php">Registracija</a></p>
